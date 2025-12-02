@@ -1,0 +1,279 @@
+// Prisma Schema for SMC Dashboard
+// This file defines the database schema using Prisma ORM
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql" // Default: MySQL (change to "postgresql" for Vercel Postgres)
+  // For Vercel Postgres: change to "postgresql"
+  // url is now configured in prisma.config.ts
+}
+
+// Product Categories Model
+model ProductCategory {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(255)
+  nameAr    String?  @db.VarChar(255)
+  slug      String   @unique @db.VarChar(255)
+  order     Int      @default(0) @map("order")
+  status    String   @default("active") @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  products  Product[]
+
+  @@map("product_categories")
+}
+
+// Products Model
+model Product {
+  id              Int       @id @default(autoincrement())
+  name            String    @db.VarChar(255)
+  nameAr          String?   @db.VarChar(255)
+  categoryId      Int?      @map("category_id")
+  category        String    @default("Mining") @db.VarChar(50)
+  status          String    @default("active") @db.VarChar(50)
+  views           Int       @default(0)
+  description     String?   @db.Text
+  descriptionAr   String?   @db.Text
+  image           String?   @db.Text
+  gallery         Json?     // Array of base64 images
+  specificationsTable Json? @map("specifications_table") // JSON structure
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  productCategory ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([categoryId])
+  @@map("products")
+}
+
+// News Model
+model News {
+  id        Int      @id @default(autoincrement())
+  title     String   @db.VarChar(255)
+  titleAr   String?  @db.VarChar(255)
+  date      DateTime  @default(now()) @db.Date
+  category  String?  @db.VarChar(100)
+  views     Int      @default(0)
+  status    String   @default("published") @db.VarChar(50)
+  content   String?  @db.Text
+  contentAr String?  @db.Text
+  image     String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("news")
+}
+
+// Users Model
+model User {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(255)
+  email       String   @unique @db.VarChar(255)
+  role        String   @default("viewer") @db.VarChar(50)
+  status      String   @default("active") @db.VarChar(50)
+  permissions Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+// Contacts Model
+model Contact {
+  id        Int       @id @default(autoincrement())
+  name      String    @db.VarChar(255)
+  email     String?   @db.VarChar(255)
+  phone     String?   @db.VarChar(50)
+  message   String?   @db.Text
+  status    String    @default("new") @db.VarChar(50)
+  date      DateTime  @default(now()) @db.Date
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@map("contacts")
+}
+
+// Complaints Model
+model Complaint {
+  id        Int       @id @default(autoincrement())
+  name      String    @db.VarChar(255)
+  email     String?   @db.VarChar(255)
+  subject   String?   @db.VarChar(255)
+  message   String?   @db.Text
+  status    String    @default("pending") @db.VarChar(50)
+  date      DateTime  @default(now()) @db.Date
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@map("complaints")
+}
+
+// Banners Model
+model Banner {
+  id          Int      @id @default(autoincrement())
+  image       String?  @db.Text
+  title       String?  @db.VarChar(255)
+  titleAr     String?  @db.VarChar(255)
+  subtitle    String?  @db.VarChar(255)
+  subtitleAr  String?  @db.VarChar(255)
+  description String?  @db.Text
+  descriptionAr String? @db.Text
+  order       Int      @default(0) @map("order")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("banners")
+}
+
+// Tenders Model
+model Tender {
+  id            Int       @id @default(autoincrement())
+  title         String    @db.VarChar(255)
+  titleAr       String?   @db.VarChar(255)
+  category      String?   @db.VarChar(100)
+  deadline      DateTime? @db.Date
+  description  String?   @db.Text
+  descriptionAr String?  @db.Text
+  status        String    @default("active") @db.VarChar(50)
+  documentFile  String?   @db.Text @map("documentFile")
+  documentFileName String? @db.VarChar(255) @map("documentFileName")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  submissions   TenderSubmission[]
+
+  @@map("tenders")
+}
+
+// Tender Submissions Model
+model TenderSubmission {
+  id          Int       @id @default(autoincrement())
+  tenderId    Int       @map("tender_id")
+  companyName String    @db.VarChar(255)
+  contactName String    @db.VarChar(255)
+  email       String    @db.VarChar(255)
+  phone       String?   @db.VarChar(50)
+  files       Json?     // Array of base64 files
+  status      String    @default("pending") @db.VarChar(50)
+  submittedAt DateTime  @default(now()) @map("submittedAt")
+
+  // Relations
+  tender      Tender    @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@index([tenderId])
+  @@index([status])
+  @@map("tender_submissions")
+}
+
+// Financial Revenue Model
+model FinancialRevenue {
+  id        Int       @id @default(autoincrement())
+  year      String    @unique @db.VarChar(10)
+  revenue   Decimal   @db.Decimal(10, 2)
+  profit    Decimal   @db.Decimal(10, 2)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("financial_revenue")
+}
+
+// Financial Production Model
+model FinancialProduction {
+  id        Int       @id @default(autoincrement())
+  month     String    @db.VarChar(50)
+  production Decimal  @db.Decimal(10, 2)
+  target    Decimal   @db.Decimal(10, 2)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("financial_production")
+}
+
+// Financial Export Model
+model FinancialExport {
+  id        Int       @id @default(autoincrement())
+  name      String    @db.VarChar(255)
+  value     Decimal   @db.Decimal(5, 2)
+  color     String    @default("#204393") @db.VarChar(20)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("financial_export")
+}
+
+// Page Content Model
+model PageContent {
+  id        Int       @id @default(autoincrement())
+  page      String    @db.VarChar(100)
+  key       String    @db.VarChar(100) @map("key")
+  valueEn   String?   @db.Text
+  valueAr   String?   @db.Text
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@unique([page, key])
+  @@map("page_content")
+}
+
+// Site Settings Model
+model SiteSetting {
+  id        Int       @id @default(autoincrement())
+  key       String    @unique @db.VarChar(100) @map("key")
+  valueEn   String?   @db.Text
+  valueAr   String?   @db.Text
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("site_settings")
+}
+
+// Chat Messages Model
+model ChatMessage {
+  id        Int       @id @default(autoincrement())
+  name      String    @db.VarChar(255)
+  email     String    @db.VarChar(255)
+  message   String    @db.Text
+  reply     String?   @db.Text
+  status    String    @default("pending") @db.VarChar(50)
+  timestamp DateTime  @default(now())
+
+  @@index([email])
+  @@index([status])
+  @@map("chat_messages")
+}
+
+// Members Model (Board Members)
+model Member {
+  id        Int       @id @default(autoincrement())
+  name      String    @db.VarChar(255)
+  nameAr    String?   @db.VarChar(255)
+  title     String?   @db.VarChar(255)
+  titleAr   String?   @db.VarChar(255)
+  order     Int       @default(0) @map("order")
+  status    String    @default("active") @db.VarChar(50)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("members")
+}
+
+// Clients Model
+model Client {
+  id        Int       @id @default(autoincrement())
+  name      String    @db.VarChar(255)
+  nameAr    String?   @db.VarChar(255)
+  logo      String?   @db.Text
+  website   String?   @db.VarChar(255)
+  sortOrder Int       @default(0) @map("order")
+  status    String    @default("active") @db.VarChar(50)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("clients")
+}

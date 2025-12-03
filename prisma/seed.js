@@ -7,25 +7,25 @@ async function main() {
   console.log('🌱 Starting database seed...\n');
 
   // Clear existing data (optional - comment out if you want to keep existing data)
-  console.log('🗑️  Clearing existing data...');
-  await prisma.tenderSubmission.deleteMany();
-  await prisma.tender.deleteMany();
-  await prisma.chatMessage.deleteMany();
-  await prisma.client.deleteMany();
-  await prisma.member.deleteMany();
-  await prisma.financialExport.deleteMany();
-  await prisma.financialProduction.deleteMany();
-  await prisma.financialRevenue.deleteMany();
-  await prisma.pageContent.deleteMany();
-  await prisma.siteSetting.deleteMany();
-  await prisma.product.deleteMany();
-  await prisma.productCategory.deleteMany();
-  await prisma.news.deleteMany();
-  await prisma.banner.deleteMany();
-  await prisma.contact.deleteMany();
-  await prisma.complaint.deleteMany();
-  await prisma.user.deleteMany();
-  console.log('✅ Existing data cleared\n');
+  // console.log('🗑️  Clearing existing data...');
+  // await prisma.tenderSubmission.deleteMany();
+  // await prisma.tender.deleteMany();
+  // await prisma.chatMessage.deleteMany();
+  // await prisma.client.deleteMany();
+  // await prisma.member.deleteMany();
+  // await prisma.financialExport.deleteMany();
+  // await prisma.financialProduction.deleteMany();
+  // await prisma.financialRevenue.deleteMany();
+  // await prisma.pageContent.deleteMany();
+  // await prisma.siteSetting.deleteMany();
+  // await prisma.product.deleteMany();
+  // await prisma.productCategory.deleteMany();
+  // await prisma.news.deleteMany();
+  // await prisma.banner.deleteMany();
+  // await prisma.contact.deleteMany();
+  // await prisma.complaint.deleteMany();
+  // await prisma.user.deleteMany();
+  // console.log('✅ Existing data cleared\n');
 
   // Create Product Categories
   console.log('📦 Creating product categories...');

@@ -62,9 +62,24 @@ app.get('/api/health', async (req, res) => {
     // Test database connection
     await prisma.$queryRawUnsafe('SELECT 1');
     
+    // Check if seed data exists
+    const [categoryCount, productCount, userCount] = await Promise.all([
+      prisma.productCategory.count().catch(() => 0),
+      prisma.product.count().catch(() => 0),
+      prisma.user.count().catch(() => 0),
+    ]);
+    
+    const isSeeded = categoryCount > 0 && productCount > 0 && userCount > 0;
+    
     res.json({
       status: 'ok',
       database: 'connected',
+      seeded: isSeeded,
+      data: {
+        categories: categoryCount,
+        products: productCount,
+        users: userCount,
+      },
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

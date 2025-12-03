@@ -59,14 +59,30 @@ app.use('/api', (req, res, next) => {
 // ==================== HEALTH CHECK ====================
 app.get('/api/health', async (req, res) => {
   try {
-    // Test database connection
-    await prisma.$queryRawUnsafe('SELECT 1');
+    // Test database connection with timeout
+    const connectionTest = Promise.race([
+      prisma.$queryRaw`SELECT 1 as test`,
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Connection timeout')), 10000)
+      )
+    ]);
     
-    // Check if seed data exists
+    await connectionTest;
+    
+    // Check if seed data exists (with individual timeouts)
     const [categoryCount, productCount, userCount] = await Promise.all([
-      prisma.productCategory.count().catch(() => 0),
-      prisma.product.count().catch(() => 0),
-      prisma.user.count().catch(() => 0),
+      Promise.race([
+        prisma.productCategory.count().catch(() => 0),
+        new Promise(resolve => setTimeout(() => resolve(0), 5000))
+      ]),
+      Promise.race([
+        prisma.product.count().catch(() => 0),
+        new Promise(resolve => setTimeout(() => resolve(0), 5000))
+      ]),
+      Promise.race([
+        prisma.user.count().catch(() => 0),
+        new Promise(resolve => setTimeout(() => resolve(0), 5000))
+      ]),
     ]);
     
     const isSeeded = categoryCount > 0 && productCount > 0 && userCount > 0;
@@ -83,10 +99,13 @@ app.get('/api/health', async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
+    // Log error for debugging
+    console.error('Health check error:', error.message);
+    
     res.status(503).json({
       status: 'error',
       database: 'disconnected',
-      error: error.message,
+      error: error.message || 'Database connection failed',
       timestamp: new Date().toISOString(),
     });
   }

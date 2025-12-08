@@ -600,8 +600,26 @@ async function main() {
     console.log('   Viewer: viewer@smc.com / Viewer@123');
     console.log('   Manager: manager@smc.com / Manager@123\n');
     
+    // Verify data was actually inserted
+    console.log('🔍 Verifying data was inserted...');
+    const userCount = await prisma.user.count();
+    const categoryCount = await prisma.productCategory.count();
+    const productCount = await prisma.product.count();
+    
+    console.log(`   Users in database: ${userCount}`);
+    console.log(`   Categories in database: ${categoryCount}`);
+    console.log(`   Products in database: ${productCount}`);
+    
+    if (userCount === 0) {
+      console.error('⚠️  WARNING: No users found in database after seeding!');
+      console.error('   The seed script may have run against a different database.');
+    } else {
+      console.log('✅ Data verification successful!\n');
+    }
+    
   } catch (error) {
     console.error('❌ Error during seeding:', error);
+    console.error('Stack trace:', error.stack);
     throw error;
   }
 }

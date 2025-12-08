@@ -8,8 +8,8 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "setup": "node scripts/setup-prisma.js",
-    "postinstall": "node scripts/postinstall.js",
     "check-db": "node scripts/check-database.js",
+    "test-db": "node scripts/test-db-connection.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
@@ -17,8 +17,12 @@
     "prisma:push": "prisma db push",
     "prisma:pull": "prisma db pull",
     "seed": "node prisma/seed.js",
-    "setup:full": "npm run prisma:generate && npm run prisma:migrate:deploy && npm run seed",
-    "setup:database": "node scripts/setup-database.js"
+    "add-password-column": "node scripts/add-password-column.js",
+    "deploy": "node -e \"console.log('Use: bash deploy.sh or .\\deploy.ps1')\"",
+    "postdeploy": "prisma generate && prisma migrate deploy",
+    "docker:build": "docker build -t smc-backend .",
+    "docker:run": "docker run -p 3000:3000 --env-file .env smc-backend",
+    "docker:compose": "docker-compose up -d"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
@@ -33,6 +37,7 @@
   "dependencies": {
     "@prisma/adapter-mariadb": "^7.0.1",
     "@prisma/client": "^7.0.1",
+    "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",

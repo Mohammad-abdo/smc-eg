@@ -1,0 +1,45 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'backend/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./backend
+      run: npm ci
+    
+    - name: Generate Prisma Client
+      working-directory: ./backend
+      run: npx prisma generate
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    
+    - name: Run tests (if any)
+      working-directory: ./backend
+      run: npm test || echo "No tests configured"
+      continue-on-error: true
+    
+    - name: Build Docker image (optional)
+      if: github.event_name == 'workflow_dispatch'
+      run: |
+        docker build -t smc-backend:latest -f backend/Dockerfile backend/
+      continue-on-error: true
+

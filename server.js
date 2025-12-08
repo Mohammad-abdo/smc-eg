@@ -7,13 +7,15 @@ import 'dotenv/config';
 import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import mysql from 'mysql2/promise';
+import bcrypt from 'bcrypt';
 
 // ES Modules equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
@@ -39,6 +41,19 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
+// Create mysql2 pool for raw queries (bypasses Prisma serialization issues with JSON fields)
+const mysqlPool = mysql.createPool({
+  host: process.env.DB_HOST || process.env.DATABASE_HOST || 'localhost',
+  user: process.env.DB_USER || process.env.DATABASE_USER || 'root',
+  password: process.env.DB_PASSWORD || process.env.DATABASE_PASSWORD || '',
+  database: process.env.DB_NAME || process.env.DATABASE_NAME || 'smc_dashboard',
+  port: Number(process.env.DB_PORT || process.env.DATABASE_PORT || 3306),
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  charset: 'utf8mb4'
+});
+
 // Test database connection on startup
 (async () => {
   try {
@@ -59,53 +74,19 @@ app.use('/api', (req, res, next) => {
 // ==================== HEALTH CHECK ====================
 app.get('/api/health', async (req, res) => {
   try {
-    // Test database connection with timeout
-    const connectionTest = Promise.race([
-      prisma.$queryRaw`SELECT 1 as test`,
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Connection timeout')), 10000)
-      )
-    ]);
-    
-    await connectionTest;
-    
-    // Check if seed data exists (with individual timeouts)
-    const [categoryCount, productCount, userCount] = await Promise.all([
-      Promise.race([
-        prisma.productCategory.count().catch(() => 0),
-        new Promise(resolve => setTimeout(() => resolve(0), 5000))
-      ]),
-      Promise.race([
-        prisma.product.count().catch(() => 0),
-        new Promise(resolve => setTimeout(() => resolve(0), 5000))
-      ]),
-      Promise.race([
-        prisma.user.count().catch(() => 0),
-        new Promise(resolve => setTimeout(() => resolve(0), 5000))
-      ]),
-    ]);
-    
-    const isSeeded = categoryCount > 0 && productCount > 0 && userCount > 0;
+    // Test database connection
+    await prisma.$queryRawUnsafe('SELECT 1');
     
     res.json({
       status: 'ok',
       database: 'connected',
-      seeded: isSeeded,
-      data: {
-        categories: categoryCount,
-        products: productCount,
-        users: userCount,
-      },
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    // Log error for debugging
-    console.error('Health check error:', error.message);
-    
     res.status(503).json({
       status: 'error',
       database: 'disconnected',
-      error: error.message || 'Database connection failed',
+      error: error.message,
       timestamp: new Date().toISOString(),
     });
   }
@@ -231,11 +212,24 @@ app.get('/api/product-categories/:id/products', async (req, res) => {
       'Expires': '0'
     });
     
-    // Use $queryRawUnsafe with JOIN to avoid Prisma MariaDB adapter issue with reserved keyword 'order' in productCategory
+    // Use mysql2 directly to bypass Prisma serialization issues with JSON fields
     const categoryId = parseInt(req.params.id);
-    const products = await prisma.$queryRawUnsafe(`
+    const [products] = await mysqlPool.execute(`
       SELECT 
-        p.*,
+        p.id,
+        p.name,
+        p.nameAr,
+        p.category_id,
+        p.category,
+        p.status,
+        p.views,
+        p.description,
+        p.descriptionAr,
+        p.image,
+        p.gallery,
+        p.specifications_table,
+        p.created_at,
+        p.updated_at,
         pc.id as productCategory_id,
         pc.name as productCategory_name,
         pc.nameAr as productCategory_nameAr,
@@ -248,12 +242,44 @@ app.get('/api/product-categories/:id/products', async (req, res) => {
       LEFT JOIN product_categories pc ON p.category_id = pc.id
       WHERE p.category_id = ? AND p.status = 'active'
       ORDER BY p.created_at DESC, p.id DESC
-    `, categoryId);
+    `, [categoryId]);
     
     // Format products to match expected structure
     const formattedProducts = products.map(product => {
+      // Parse JSON fields from raw query results (MySQL returns JSON as strings)
+      let gallery = product.gallery;
+      if (gallery && typeof gallery === 'string') {
+        try {
+          gallery = JSON.parse(gallery);
+        } catch (e) {
+          gallery = null;
+        }
+      }
+      
+      let specificationsTable = product.specifications_table;
+      if (specificationsTable && typeof specificationsTable === 'string') {
+        try {
+          specificationsTable = JSON.parse(specificationsTable);
+        } catch (e) {
+          specificationsTable = null;
+        }
+      }
+      
       const formatted = {
-        ...product,
+        id: product.id,
+        name: product.name,
+        nameAr: product.nameAr,
+        categoryId: product.category_id,
+        category: product.category,
+        status: product.status,
+        views: product.views,
+        description: product.description,
+        descriptionAr: product.descriptionAr,
+        image: product.image,
+        gallery: gallery,
+        specificationsTable: specificationsTable,
+        createdAt: product.created_at,
+        updatedAt: product.updated_at,
         productCategory: product.productCategory_id ? {
           id: product.productCategory_id,
           name: product.productCategory_name,
@@ -265,15 +291,6 @@ app.get('/api/product-categories/:id/products', async (req, res) => {
           updatedAt: product.productCategory_updated_at,
         } : null,
       };
-      // Remove prefixed fields
-      delete formatted.productCategory_id;
-      delete formatted.productCategory_name;
-      delete formatted.productCategory_nameAr;
-      delete formatted.productCategory_slug;
-      delete formatted.productCategory_order;
-      delete formatted.productCategory_status;
-      delete formatted.productCategory_created_at;
-      delete formatted.productCategory_updated_at;
       return formatProduct(formatted);
     });
     
@@ -507,11 +524,23 @@ app.get('/api/products', async (req, res) => {
       'Vary': '*'
     });
     
-    // Use $queryRawUnsafe with JOIN to avoid Prisma MariaDB adapter issue with reserved keyword 'order' in productCategory
-    // Using $queryRawUnsafe to avoid serialization issues with template literals
-    const products = await prisma.$queryRawUnsafe(`
+    // Use mysql2 directly to bypass Prisma serialization issues with JSON fields
+    const [products] = await mysqlPool.execute(`
       SELECT 
-        p.*,
+        p.id,
+        p.name,
+        p.nameAr,
+        p.category_id,
+        p.category,
+        p.status,
+        p.views,
+        p.description,
+        p.descriptionAr,
+        p.image,
+        p.gallery,
+        p.specifications_table,
+        p.created_at,
+        p.updated_at,
         pc.id as productCategory_id,
         pc.name as productCategory_name,
         pc.nameAr as productCategory_nameAr,
@@ -527,8 +556,40 @@ app.get('/api/products', async (req, res) => {
     
     // Format products to match expected structure
     const formattedProducts = products.map(product => {
+      // Parse JSON fields from raw query results (MySQL returns JSON as strings)
+      let gallery = product.gallery;
+      if (gallery && typeof gallery === 'string') {
+        try {
+          gallery = JSON.parse(gallery);
+        } catch (e) {
+          gallery = null;
+        }
+      }
+      
+      let specificationsTable = product.specifications_table;
+      if (specificationsTable && typeof specificationsTable === 'string') {
+        try {
+          specificationsTable = JSON.parse(specificationsTable);
+        } catch (e) {
+          specificationsTable = null;
+        }
+      }
+      
       const formatted = {
-        ...product,
+        id: product.id,
+        name: product.name,
+        nameAr: product.nameAr,
+        categoryId: product.category_id,
+        category: product.category,
+        status: product.status,
+        views: product.views,
+        description: product.description,
+        descriptionAr: product.descriptionAr,
+        image: product.image,
+        gallery: gallery,
+        specificationsTable: specificationsTable,
+        createdAt: product.created_at,
+        updatedAt: product.updated_at,
         productCategory: product.productCategory_id ? {
           id: product.productCategory_id,
           name: product.productCategory_name,
@@ -540,15 +601,6 @@ app.get('/api/products', async (req, res) => {
           updatedAt: product.productCategory_updated_at,
         } : null,
       };
-      // Remove prefixed fields
-      delete formatted.productCategory_id;
-      delete formatted.productCategory_name;
-      delete formatted.productCategory_nameAr;
-      delete formatted.productCategory_slug;
-      delete formatted.productCategory_order;
-      delete formatted.productCategory_status;
-      delete formatted.productCategory_created_at;
-      delete formatted.productCategory_updated_at;
       return formatProduct(formatted);
     });
     
@@ -572,11 +624,24 @@ app.get('/api/products/:id', async (req, res) => {
       'Surrogate-Control': 'no-store'
     });
     
-    // Use $queryRawUnsafe with JOIN to avoid Prisma MariaDB adapter issue with reserved keyword 'order' in productCategory
+    // Use mysql2 directly to bypass Prisma serialization issues with JSON fields
     const productId = parseInt(req.params.id);
-    const [product] = await prisma.$queryRawUnsafe(`
+    const [products] = await mysqlPool.execute(`
       SELECT 
-        p.*,
+        p.id,
+        p.name,
+        p.nameAr,
+        p.category_id,
+        p.category,
+        p.status,
+        p.views,
+        p.description,
+        p.descriptionAr,
+        p.image,
+        p.gallery,
+        p.specifications_table,
+        p.created_at,
+        p.updated_at,
         pc.id as productCategory_id,
         pc.name as productCategory_name,
         pc.nameAr as productCategory_nameAr,
@@ -589,13 +654,46 @@ app.get('/api/products/:id', async (req, res) => {
       LEFT JOIN product_categories pc ON p.category_id = pc.id
       WHERE p.id = ?
       LIMIT 1
-    `, productId);
+    `, [productId]);
+    const product = products[0];
     
     if (!product) return res.status(404).json({ error: 'Product not found' });
     
+    // Parse JSON fields from raw query results (MySQL returns JSON as strings)
+    let gallery = product.gallery;
+    if (gallery && typeof gallery === 'string') {
+      try {
+        gallery = JSON.parse(gallery);
+      } catch (e) {
+        gallery = null;
+      }
+    }
+    
+    let specificationsTable = product.specifications_table;
+    if (specificationsTable && typeof specificationsTable === 'string') {
+      try {
+        specificationsTable = JSON.parse(specificationsTable);
+      } catch (e) {
+        specificationsTable = null;
+      }
+    }
+    
     // Format product to match expected structure
     const formatted = {
-      ...product,
+      id: product.id,
+      name: product.name,
+      nameAr: product.nameAr,
+      categoryId: product.category_id,
+      category: product.category,
+      status: product.status,
+      views: product.views,
+      description: product.description,
+      descriptionAr: product.descriptionAr,
+      image: product.image,
+      gallery: gallery,
+      specificationsTable: specificationsTable,
+      createdAt: product.created_at,
+      updatedAt: product.updated_at,
       productCategory: product.productCategory_id ? {
         id: product.productCategory_id,
         name: product.productCategory_name,
@@ -607,15 +705,6 @@ app.get('/api/products/:id', async (req, res) => {
         updatedAt: product.productCategory_updated_at,
       } : null,
     };
-    // Remove prefixed fields
-    delete formatted.productCategory_id;
-    delete formatted.productCategory_name;
-    delete formatted.productCategory_nameAr;
-    delete formatted.productCategory_slug;
-    delete formatted.productCategory_order;
-    delete formatted.productCategory_status;
-    delete formatted.productCategory_created_at;
-    delete formatted.productCategory_updated_at;
     
     res.json(formatProduct(formatted));
   } catch (error) {
@@ -938,6 +1027,60 @@ app.delete('/api/news/:id', async (req, res) => {
     }
     console.error('Error deleting news:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== AUTHENTICATION ROUTES ====================
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    // Find user by email
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase().trim() },
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Check if user has a password (for backward compatibility)
+    if (!user.password) {
+      return res.status(401).json({ 
+        error: 'Password not set for this user. Please contact administrator.' 
+      });
+    }
+
+    // Compare password with bcrypt
+    const passwordMatch = await bcrypt.compare(password, user.password);
+
+    if (!passwordMatch) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Check if user is active
+    if (user.status !== 'active') {
+      return res.status(403).json({ error: 'Account is inactive. Please contact administrator.' });
+    }
+
+    // Return user data (without password)
+    const { password: _, ...userWithoutPassword } = user;
+    
+    res.json({
+      success: true,
+      user: userWithoutPassword,
+      message: 'Login successful'
+    });
+  } catch (error) {
+    console.error('Error during login:', error);
+    res.status(500).json({ 
+      error: error.message || 'Login failed',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 

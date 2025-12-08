@@ -39,7 +39,7 @@ CREATE TABLE `news` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `title` VARCHAR(255) NOT NULL,
     `titleAr` VARCHAR(255) NULL,
-    `date` DATE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `date` DATE NOT NULL DEFAULT (CURDATE()),
     `category` VARCHAR(100) NULL,
     `views` INTEGER NOT NULL DEFAULT 0,
     `status` VARCHAR(50) NOT NULL DEFAULT 'published',
@@ -57,6 +57,7 @@ CREATE TABLE `users` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `name` VARCHAR(255) NOT NULL,
     `email` VARCHAR(255) NOT NULL,
+    `password` VARCHAR(255) NULL,
     `role` VARCHAR(50) NOT NULL DEFAULT 'viewer',
     `status` VARCHAR(50) NOT NULL DEFAULT 'active',
     `permissions` JSON NULL,
@@ -75,7 +76,7 @@ CREATE TABLE `contacts` (
     `phone` VARCHAR(50) NULL,
     `message` TEXT NULL,
     `status` VARCHAR(50) NOT NULL DEFAULT 'new',
-    `date` DATE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `date` DATE NOT NULL DEFAULT (CURDATE()),
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
     PRIMARY KEY (`id`)
@@ -89,7 +90,7 @@ CREATE TABLE `complaints` (
     `subject` VARCHAR(255) NULL,
     `message` TEXT NULL,
     `status` VARCHAR(50) NOT NULL DEFAULT 'pending',
-    `date` DATE NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `date` DATE NOT NULL DEFAULT (CURDATE()),
     `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
     PRIMARY KEY (`id`)

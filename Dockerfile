@@ -2,7 +2,7 @@
 # Supports deployment to any Docker-compatible server
 # Build from backend directory: docker build -f Dockerfile .
 
-FROM node:18-alpine AS base
+FROM node:20-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps

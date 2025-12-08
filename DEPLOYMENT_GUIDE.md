@@ -126,7 +126,7 @@ npx prisma migrate deploy
 ## 🖥️ Traditional Server Deployment
 
 ### Prerequisites
-- Node.js 18+ installed
+- Node.js 20.19+ installed (required for Prisma 7.0.1+)
 - MySQL/MariaDB database
 - PM2 (recommended for process management)
 
@@ -255,7 +255,7 @@ Add to `package.json`:
 
 3. **Install dependencies:**
    ```bash
-   curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
    sudo apt-get install -y nodejs
    sudo npm install -g pm2
    ```

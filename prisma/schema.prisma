@@ -57,7 +57,7 @@ model News {
   id        Int      @id @default(autoincrement())
   title     String   @db.VarChar(255)
   titleAr   String?  @db.VarChar(255)
-  date      DateTime  @default(now()) @db.Date
+  date      DateTime  @db.Date
   category  String?  @db.VarChar(100)
   views     Int      @default(0)
   status    String   @default("published") @db.VarChar(50)
@@ -93,7 +93,7 @@ model Contact {
   phone     String?   @db.VarChar(50)
   message   String?   @db.Text
   status    String    @default("new") @db.VarChar(50)
-  date      DateTime  @default(now()) @db.Date
+  date      DateTime  @db.Date
   createdAt DateTime  @default(now()) @map("created_at")
 
   @@map("contacts")
@@ -107,7 +107,7 @@ model Complaint {
   subject   String?   @db.VarChar(255)
   message   String?   @db.Text
   status    String    @default("pending") @db.VarChar(50)
-  date      DateTime  @default(now()) @db.Date
+  date      DateTime  @db.Date
   createdAt DateTime  @default(now()) @map("created_at")
 
   @@map("complaints")

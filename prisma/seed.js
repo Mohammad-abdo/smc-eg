@@ -7,6 +7,15 @@ import bcrypt from 'bcrypt';
 
 async function main() {
   console.log('🌱 Starting comprehensive database seed...\n');
+  
+  // Show which database we're connecting to
+  const dbUrl = process.env.DATABASE_URL || 
+    `mysql://${process.env.DB_USER || 'root'}@${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || 3306}/${process.env.DB_NAME || 'smc_dashboard'}`;
+  const dbInfo = dbUrl.includes('railway') ? 'Railway (Remote)' : 
+                 dbUrl.includes('localhost') ? 'Local MySQL' : 'Remote Database';
+  console.log(`📊 Connecting to: ${dbInfo}`);
+  console.log(`   Host: ${process.env.DB_HOST || 'localhost'}`);
+  console.log(`   Database: ${process.env.DB_NAME || 'smc_dashboard'}\n`);
 
   try {
     // Clear existing data (optional - comment out if you want to keep existing data)

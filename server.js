@@ -26,6 +26,11 @@ const allowedOrigins = [
   'http://127.0.0.1:3001',
 ];
 
+// Add DigitalOcean App Platform URL if provided
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -38,6 +43,10 @@ app.use(cors({
       if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
         callback(null, true);
       } else {
+        // In production, log but allow (you can change this to block)
+        if (process.env.NODE_ENV === 'production') {
+          console.warn(`CORS: Blocked origin: ${origin}`);
+        }
         callback(new Error('Not allowed by CORS'));
       }
     }
@@ -47,6 +56,17 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 app.use(express.json({ limit: '50mb' })); // Increase limit for base64 images
+
+// Request timeout middleware (prevent hanging requests)
+app.use((req, res, next) => {
+  // Set timeout for all requests (30 seconds)
+  req.setTimeout(30000, () => {
+    if (!res.headersSent) {
+      res.status(408).json({ error: 'Request timeout' });
+    }
+  });
+  next();
+});
 
 // Middleware to prevent caching for all API routes - VERY AGGRESSIVE (for Vercel CDN)
 app.use('/api', (req, res, next) => {
@@ -69,6 +89,7 @@ app.use('/api', (req, res, next) => {
 });
 
 // Create mysql2 pool for raw queries (bypasses Prisma serialization issues with JSON fields)
+// Note: This pool is separate from Prisma adapter pool to avoid conflicts
 const mysqlPool = mysql.createPool({
   host: process.env.DB_HOST || process.env.DATABASE_HOST || 'localhost',
   user: process.env.DB_USER || process.env.DATABASE_USER || 'root',
@@ -76,10 +97,27 @@ const mysqlPool = mysql.createPool({
   database: process.env.DB_NAME || process.env.DATABASE_NAME || 'smc_dashboard',
   port: Number(process.env.DB_PORT || process.env.DATABASE_PORT || 3306),
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 5, // Reduced to prevent connection exhaustion
   queueLimit: 0,
-  charset: 'utf8mb4'
+  charset: 'utf8mb4',
+  acquireTimeout: 30000, // 30 seconds
+  timeout: 30000, // 30 seconds
 });
+
+// Graceful shutdown for mysql pool
+if (typeof process !== 'undefined') {
+  process.on('beforeExit', async () => {
+    await mysqlPool.end().catch(() => {});
+  });
+  
+  process.on('SIGINT', async () => {
+    await mysqlPool.end().catch(() => {});
+  });
+  
+  process.on('SIGTERM', async () => {
+    await mysqlPool.end().catch(() => {});
+  });
+}
 
 // Test database connection on startup
 (async () => {
@@ -100,22 +138,47 @@ const mysqlPool = mysql.createPool({
 
 // ==================== HEALTH CHECK ====================
 app.get('/api/health', async (req, res) => {
+  // Set timeout to prevent hanging requests (5 seconds max)
+  const timeoutId = setTimeout(() => {
+    if (!res.headersSent) {
+      res.status(503).json({
+        status: 'error',
+        database: 'timeout',
+        message: 'Health check timed out',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, 5000);
+
   try {
-    // Test database connection
-    await prisma.$queryRawUnsafe('SELECT 1');
+    // Test database connection with timeout protection
+    const connectionTest = Promise.race([
+      prisma.$queryRawUnsafe('SELECT 1'),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database connection timeout')), 4000)
+      )
+    ]);
     
-    res.json({
-      status: 'ok',
-      database: 'connected',
-      timestamp: new Date().toISOString(),
-    });
+    await connectionTest;
+    clearTimeout(timeoutId);
+    
+    if (!res.headersSent) {
+      res.json({
+        status: 'ok',
+        database: 'connected',
+        timestamp: new Date().toISOString(),
+      });
+    }
   } catch (error) {
-    res.status(503).json({
-      status: 'error',
-      database: 'disconnected',
-      error: error.message,
-      timestamp: new Date().toISOString(),
-    });
+    clearTimeout(timeoutId);
+    if (!res.headersSent) {
+      res.status(503).json({
+        status: 'error',
+        database: 'disconnected',
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      });
+    }
   }
 });
 

@@ -47,3 +47,4 @@ npm run seed
 
 إذا استمرت المشكلة، يمكنك تعديل seed script لاستخدام mysql2 مباشرة بدلاً من Prisma.
 
+

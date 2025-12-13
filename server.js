@@ -2,7 +2,9 @@
 import express from 'express';
 import cors from 'cors';
 import { prisma, formatProduct, formatCategory } from './lib/db.js';
-import { Prisma } from '@prisma/client';
+// Prisma is not directly used, but imported for type checking if needed
+// import pkg from '@prisma/client';
+// const { Prisma } = pkg;
 import 'dotenv/config';
 import { execSync } from 'child_process';
 import path from 'path';
@@ -135,6 +137,19 @@ if (typeof process !== 'undefined') {
 })();
 
 // Gallery column is handled by Prisma schema
+
+// ==================== ROOT ROUTE ====================
+app.get('/', (req, res) => {
+  res.json({
+    message: 'SMC Dashboard API',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      health: '/api/health',
+      documentation: 'See README.md for API documentation',
+    },
+  });
+});
 
 // ==================== HEALTH CHECK ====================
 app.get('/api/health', async (req, res) => {

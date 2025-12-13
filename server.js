@@ -17,7 +17,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 
 // Middleware - CORS Configuration
 const allowedOrigins = [
@@ -30,32 +30,47 @@ const allowedOrigins = [
 
 // Add DigitalOcean App Platform URL if provided
 if (process.env.FRONTEND_URL) {
-  allowedOrigins.push(process.env.FRONTEND_URL);
+  const frontendUrl = process.env.FRONTEND_URL.trim();
+  // Remove trailing slash if present
+  const cleanUrl = frontendUrl.replace(/\/$/, '');
+  allowedOrigins.push(cleanUrl);
+  console.log(`✅ Added FRONTEND_URL to CORS: ${cleanUrl}`);
 }
+
+console.log('🌐 Allowed CORS origins:', allowedOrigins);
 
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      // Check if it's a localhost variant
-      if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
-        callback(null, true);
-      } else {
-        // In production, log but allow (you can change this to block)
-        if (process.env.NODE_ENV === 'production') {
-          console.warn(`CORS: Blocked origin: ${origin}`);
-        }
-        callback(new Error('Not allowed by CORS'));
-      }
+    if (!origin) {
+      return callback(null, true);
     }
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Check if it's a localhost variant
+    if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+      return callback(null, true);
+    }
+    
+    // In development, allow all origins for easier testing
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`✅ CORS: Allowing origin in development: ${origin}`);
+      return callback(null, true);
+    }
+    
+    // In production, log and block
+    console.warn(`❌ CORS: Blocked origin: ${origin}`);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  exposedHeaders: ['Content-Length', 'Content-Type'],
+  maxAge: 86400, // 24 hours
 }));
 app.use(express.json({ limit: '50mb' })); // Increase limit for base64 images
 

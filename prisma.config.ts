@@ -1,31 +1,44 @@
-// Prisma v7 Configuration
-// This file configures Prisma to use DATABASE_URL from environment variables
+// Prisma Configuration for Prisma v7
+// In Prisma 7, datasource URL must be in this file, not in schema.prisma
+import { config } from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
 
-require('dotenv').config();
-const { defineConfig, env } = require('prisma/config');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
-// Ensure DATABASE_URL is set (build from separate vars if needed)
-// This MUST run BEFORE Prisma tries to read DATABASE_URL
-// Using CommonJS version for compatibility
-const { getDatabaseUrl } = require('./lib/env.cjs');
+// Load environment variables
+config({ path: resolve(__dirname, '.env') });
 
-// Build DATABASE_URL if it's invalid or missing
-// This will automatically fix invalid DATABASE_URL or build from DB_* variables
-getDatabaseUrl();
+// Build DATABASE_URL if not provided
+function getDatabaseUrl() {
+  if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '') {
+    return process.env.DATABASE_URL.trim();
+  }
 
-// Log the final DATABASE_URL (without password) for debugging
-const dbUrl = process.env.DATABASE_URL || '';
-if (dbUrl) {
-  const maskedUrl = dbUrl.replace(/:([^:@]+)@/, ':***@');
-  console.log('📊 Using DATABASE_URL:', maskedUrl);
+  const host = process.env.DB_HOST || 'localhost';
+  const user = process.env.DB_USER || 'root';
+  const password = process.env.DB_PASSWORD || '';
+  const database = process.env.DB_NAME || 'smc-backend';
+  const port = process.env.DB_PORT || '3306';
+
+  const encodedPassword = encodeURIComponent(password);
+  let url = `mysql://${user}:${encodedPassword}@${host}:${port}/${database}`;
+  
+  const isRemote = host.includes('ondigitalocean.com') ||
+                   (!host.includes('localhost') && !host.includes('127.0.0.1'));
+  
+  if (isRemote) {
+    url += '?ssl={"rejectUnauthorized":false}&connect_timeout=60&acquire_timeout=60';
+  }
+  
+  return url;
 }
 
-module.exports = defineConfig({
-  schema: 'prisma/schema.prisma',
-  migrations: {
-    path: 'prisma/migrations',
-  },
+// Export Prisma config with datasource URL
+export default {
   datasource: {
-    url: env('DATABASE_URL'),
+    url: getDatabaseUrl(),
   },
-});
+};
+

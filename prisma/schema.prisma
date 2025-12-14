@@ -6,9 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql" // Default: MySQL (change to "postgresql" for Vercel Postgres)
-  // For Vercel Postgres: change to "postgresql"
-  // url is now configured in prisma.config.ts
+  provider = "mysql"
 }
 
 // Product Categories Model

@@ -2,7 +2,7 @@
 import cors from 'cors';
 
 const allowedOrigins = [
-  'https://smc-frontend-weld.vercel.app',
+  'https://smc-eg.com',
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:8080',

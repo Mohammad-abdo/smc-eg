@@ -140,12 +140,12 @@ export const createProduct = async (req, res, next) => {
     const galleryJson = gallery && Array.isArray(gallery) ? JSON.stringify(gallery) : null;
     const specsJson = specifications_table ? JSON.stringify(specifications_table) : null;
     
-    await prisma.$queryRawUnsafe(`
+    await mysqlPool.execute(`
       INSERT INTO products (name, nameAr, category_id, category, status, views, description, descriptionAr, image, gallery, specifications_table, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-    `, name, nameAr || null, category_id || null, category || 'Mining', status || 'active', views || 0, description || null, descriptionAr || null, image || null, galleryJson, specsJson);
+    `, [name, nameAr || null, category_id || null, category || 'Mining', status || 'active', views || 0, description || null, descriptionAr || null, image || null, galleryJson, specsJson]);
     
-    const [newProduct] = await prisma.$queryRawUnsafe(`
+    const [products] = await mysqlPool.execute(`
       SELECT 
         p.*,
         pc.id as productCategory_id,
@@ -161,6 +161,11 @@ export const createProduct = async (req, res, next) => {
       ORDER BY p.id DESC
       LIMIT 1
     `);
+    
+    const newProduct = products[0];
+    if (!newProduct) {
+      return res.status(500).json({ error: 'Product was created but could not be retrieved' });
+    }
     
     const formatted = {
       ...newProduct,
@@ -199,7 +204,7 @@ export const updateProduct = async (req, res, next) => {
     const specsJson = specifications_table ? JSON.stringify(specifications_table) : null;
     const productId = parseInt(req.params.id);
     
-    await prisma.$queryRawUnsafe(`
+    await mysqlPool.execute(`
       UPDATE products 
       SET name = ?, 
           nameAr = ?, 
@@ -214,9 +219,9 @@ export const updateProduct = async (req, res, next) => {
           specifications_table = ?, 
           updated_at = NOW()
       WHERE id = ?
-    `, name, nameAr || null, category_id || null, category || 'Mining', status || 'active', views || 0, description || null, descriptionAr || null, image || null, galleryJson, specsJson, productId);
+    `, [name, nameAr || null, category_id || null, category || 'Mining', status || 'active', views || 0, description || null, descriptionAr || null, image || null, galleryJson, specsJson, productId]);
     
-    const [updatedProduct] = await prisma.$queryRawUnsafe(`
+    const [products] = await mysqlPool.execute(`
       SELECT 
         p.*,
         pc.id as productCategory_id,
@@ -231,8 +236,9 @@ export const updateProduct = async (req, res, next) => {
       LEFT JOIN product_categories pc ON p.category_id = pc.id
       WHERE p.id = ?
       LIMIT 1
-    `, productId);
+    `, [productId]);
     
+    const updatedProduct = products[0];
     if (!updatedProduct) {
       return res.status(404).json({ error: 'Product not found' });
     }
@@ -268,14 +274,18 @@ export const updateProduct = async (req, res, next) => {
 
 export const deleteProduct = async (req, res, next) => {
   try {
-    await prisma.product.delete({
-      where: { id: parseInt(req.params.id) },
-    });
-    res.json({ success: true });
-  } catch (error) {
-    if (error.code === 'P2025') {
+    const productId = parseInt(req.params.id);
+    const [result] = await mysqlPool.execute(
+      'DELETE FROM products WHERE id = ?',
+      [productId]
+    );
+    
+    if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Product not found' });
     }
+    
+    res.json({ success: true });
+  } catch (error) {
     next(error);
   }
 };

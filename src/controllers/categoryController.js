@@ -5,7 +5,7 @@ import { formatCategory, formatProduct } from '../utils/formatters.js';
 
 export const getAllCategories = async (req, res, next) => {
   try {
-    const categories = await prisma.$queryRawUnsafe(`
+    const [categories] = await mysqlPool.execute(`
       SELECT * FROM product_categories 
       WHERE status = 'active'
       ORDER BY \`order\` ASC, id ASC
@@ -19,10 +19,11 @@ export const getAllCategories = async (req, res, next) => {
 export const getCategoryById = async (req, res, next) => {
   try {
     const categoryId = parseInt(req.params.id);
-    const [category] = await prisma.$queryRawUnsafe(`
+    const [categories] = await mysqlPool.execute(`
       SELECT * FROM product_categories WHERE id = ? LIMIT 1
-    `, categoryId);
+    `, [categoryId]);
     
+    const category = categories[0];
     if (!category) {
       return res.status(404).json({ error: 'Category not found' });
     }
@@ -130,15 +131,16 @@ export const createCategory = async (req, res, next) => {
       });
     }
     
-    await prisma.$queryRawUnsafe(`
+    await mysqlPool.execute(`
       INSERT INTO product_categories (name, nameAr, slug, \`order\`, status, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, NOW(), NOW())
-    `, name, nameAr || null, slug, order || 0, status || 'active');
+    `, [name, nameAr || null, slug, order || 0, status || 'active']);
     
-    const [newCategory] = await prisma.$queryRawUnsafe(`
+    const [categories] = await mysqlPool.execute(`
       SELECT * FROM product_categories WHERE slug = ? LIMIT 1
-    `, slug);
+    `, [slug]);
     
+    const newCategory = categories[0];
     if (!newCategory) {
       return res.status(500).json({ error: 'Category was created but could not be retrieved' });
     }
@@ -161,7 +163,7 @@ export const updateCategory = async (req, res, next) => {
     }
     
     const categoryId = parseInt(req.params.id);
-    await prisma.$queryRawUnsafe(`
+    await mysqlPool.execute(`
       UPDATE product_categories 
       SET name = ?, 
           nameAr = ?, 
@@ -170,12 +172,13 @@ export const updateCategory = async (req, res, next) => {
           status = ?, 
           updated_at = NOW()
       WHERE id = ?
-    `, name, nameAr || null, slug, order || 0, status || 'active', categoryId);
+    `, [name, nameAr || null, slug, order || 0, status || 'active', categoryId]);
     
-    const [updatedCategory] = await prisma.$queryRawUnsafe(`
+    const [categories] = await mysqlPool.execute(`
       SELECT * FROM product_categories WHERE id = ? LIMIT 1
-    `, categoryId);
+    `, [categoryId]);
     
+    const updatedCategory = categories[0];
     if (!updatedCategory) {
       return res.status(404).json({ error: 'Category not found' });
     }

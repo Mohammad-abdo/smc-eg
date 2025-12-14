@@ -98,12 +98,13 @@ if (globalForPrisma.prisma) {
       password: process.env.DB_PASSWORD || '',
       database: process.env.DB_NAME || 'smc-backend',
       port: Number(process.env.DB_PORT || 3306),
-      // Pool configuration
-      connectionLimit: 5,
+      // Pool configuration - increased for better stability
+      connectionLimit: 10, // Increased from 5 to handle more concurrent requests
       waitForConnections: true,
       queueLimit: 0,
-      // Connection configuration
+      // Connection timeout
       connectTimeout: 30000, // 30 seconds
+      // Keep connections alive to prevent timeouts
       enableKeepAlive: true,
       keepAliveInitialDelay: 0,
     };

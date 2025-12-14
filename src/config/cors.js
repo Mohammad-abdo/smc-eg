@@ -5,16 +5,21 @@ const allowedOrigins = [
   'https://smc-frontend-weld.vercel.app',
   'http://localhost:3000',
   'http://localhost:3001',
+  'http://localhost:8080',
   'http://127.0.0.1:3000',
+  'http://127.0.0.1:8080',
   'http://127.0.0.1:3001',
 ];
 
 // Add FRONTEND_URL from environment if provided
 if (process.env.FRONTEND_URL) {
   const frontendUrl = process.env.FRONTEND_URL.trim();
-  const cleanUrl = frontendUrl.replace(/\/$/, '');
-  allowedOrigins.push(cleanUrl);
-  console.log(`✅ Added FRONTEND_URL to CORS: ${cleanUrl}`);
+  // Remove trailing slashes and any extra characters
+  const cleanUrl = frontendUrl.replace(/\/+$/, '').split(' ')[0].split('|')[0].trim();
+  if (cleanUrl && !allowedOrigins.includes(cleanUrl)) {
+    allowedOrigins.push(cleanUrl);
+    console.log(`✅ Added FRONTEND_URL to CORS: ${cleanUrl}`);
+  }
 }
 
 console.log('🌐 Allowed CORS origins:', allowedOrigins);
@@ -48,7 +53,22 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'X-Request-ID',
+    'X-Session-ID',
+    'X-Vercel-Cache-Control',
+    'CDN-Cache-Control',
+    'Vercel-CDN-Cache-Control',
+    'X-Cache-Bypass',
+    'Cache-Control',
+    'Pragma',
+    'Expires',
+  ],
   exposedHeaders: ['Content-Length', 'Content-Type'],
   maxAge: 86400, // 24 hours
 };

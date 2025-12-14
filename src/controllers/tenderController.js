@@ -95,6 +95,31 @@ export const submitTender = async (req, res, next) => {
   }
 };
 
+export const submitTenderFromBody = async (req, res, next) => {
+  try {
+    const { tenderId, companyName, contactName, email, phone, files } = req.body;
+
+    if (!tenderId) {
+      return res.status(400).json({ error: 'tenderId is required' });
+    }
+
+    const submission = await prisma.tenderSubmission.create({
+      data: {
+        tenderId: parseInt(tenderId),
+        companyName,
+        contactName,
+        email,
+        phone: phone || null,
+        files: files || null,
+        status: 'pending',
+      },
+    });
+    res.json(submission);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getTenderSubmissions = async (req, res, next) => {
   try {
     const tenderId = parseInt(req.params.id);

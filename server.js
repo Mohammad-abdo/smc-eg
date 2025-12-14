@@ -52,10 +52,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// API Routes
-app.use('/api', apiRoutes);
-
-// Migration endpoints (keep for backward compatibility)
+// Migration endpoints (keep for backward compatibility) - must be before /api routes
 app.post('/api/init', async (req, res) => {
   try {
     console.log('Running Prisma migrations...');
@@ -128,8 +125,15 @@ app.get('/api/migrations/status', async (req, res) => {
   }
 });
 
-// Error handling middleware (must be last)
+// API Routes - must be after specific routes like /api/init
+app.use('/api', apiRoutes);
+// Also mount routes without /api prefix for frontend compatibility
+app.use(apiRoutes);
+
+// 404 handler - must be after all routes
 app.use(notFoundHandler);
+
+// Error handler - must be last
 app.use(errorHandler);
 
 // Start server
@@ -137,4 +141,5 @@ app.use(errorHandler);
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`📡 API available at http://localhost:${PORT}/api`);
   console.log(`🏥 Health check at http://localhost:${PORT}/api/health`);
-    });
+  console.log(`📚 All routes registered successfully`);
+});

@@ -12,8 +12,8 @@ const mysqlPool = mysql.createPool({
   connectionLimit: 5,
   queueLimit: 0,
   charset: 'utf8mb4',
-  acquireTimeout: 30000,
-  timeout: 30000,
+  // Note: acquireTimeout and timeout are pool-level options, not connection options
+  // They should be set in pool configuration, not connection config
 });
 
 // Graceful shutdown

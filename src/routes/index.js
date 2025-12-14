@@ -17,6 +17,7 @@ import chatRoutes from './chatRoutes.js';
 import settingsRoutes from './settingsRoutes.js';
 import statisticsRoutes from './statisticsRoutes.js';
 import healthRoutes from './healthRoutes.js';
+import mediaRoutes from './mediaRoutes.js';
 
 const router = express.Router();
 
@@ -40,6 +41,7 @@ router.use('/financial', financialRoutes);
 router.use('/chat', chatRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/statistics', statisticsRoutes);
+router.use('/media', mediaRoutes);
 
 export default router;
 

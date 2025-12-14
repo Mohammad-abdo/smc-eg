@@ -14,3 +14,4 @@ node setup-env.js
 Write-Host "Running Prisma: $Command" -ForegroundColor Cyan
 & .\node_modules\.bin\prisma.cmd $Command.Split(' ')
 
+

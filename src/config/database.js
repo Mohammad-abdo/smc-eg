@@ -96,14 +96,14 @@ if (globalForPrisma.prisma) {
       host: process.env.DB_HOST || 'localhost',
       user: process.env.DB_USER || 'root',
       password: process.env.DB_PASSWORD || '',
-      database: process.env.DB_NAME || 'smc-backend',
+      database: process.env.DB_NAME || 'smc_dashboard', // Fixed: match seed.js default
       port: Number(process.env.DB_PORT || 3306),
       // Pool configuration - increased for better stability
       connectionLimit: 10, // Increased from 5 to handle more concurrent requests
       waitForConnections: true,
       queueLimit: 0,
-      // Connection timeout
-      connectTimeout: 30000, // 30 seconds
+      // Connection timeout - increased for slow connections
+      connectTimeout: 30000, // 30 seconds to establish connection
       // Keep connections alive to prevent timeouts
       enableKeepAlive: true,
       keepAliveInitialDelay: 0,

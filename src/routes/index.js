@@ -18,6 +18,7 @@ import settingsRoutes from './settingsRoutes.js';
 import statisticsRoutes from './statisticsRoutes.js';
 import healthRoutes from './healthRoutes.js';
 import mediaRoutes from './mediaRoutes.js';
+import pageContentRoutes from './pageContentRoutes.js';
 
 const router = express.Router();
 
@@ -42,6 +43,7 @@ router.use('/chat', chatRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/statistics', statisticsRoutes);
 router.use('/media', mediaRoutes);
+router.use('/page-content', pageContentRoutes);
 
 export default router;
 

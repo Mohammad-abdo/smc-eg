@@ -136,10 +136,32 @@ app.use(notFoundHandler);
 // Error handler - must be last
 app.use(errorHandler);
 
-// Start server
-    app.listen(PORT, () => {
+// Start server with error handling
+const server = app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`📡 API available at http://localhost:${PORT}/api`);
   console.log(`🏥 Health check at http://localhost:${PORT}/api/health`);
   console.log(`📚 All routes registered successfully`);
+});
+
+// Handle port already in use error
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`\n❌ Port ${PORT} is already in use!\n`);
+    console.error('🔍 Solutions:');
+    console.error(`   1. Kill the process using port ${PORT}:`);
+    console.error(`      Windows: netstat -ano | findstr :${PORT}`);
+    console.error(`      Then: taskkill /PID <PID> /F`);
+    console.error(`      Or use: Get-Process -Id (Get-NetTCPConnection -LocalPort ${PORT}).OwningProcess | Stop-Process -Force`);
+    console.error(`   2. Use a different port by setting PORT environment variable:`);
+    console.error(`      PORT=3001 npm run dev`);
+    console.error(`   3. Find and kill the process automatically:`);
+    console.error(`      Windows PowerShell:`);
+    console.error(`      $process = Get-NetTCPConnection -LocalPort ${PORT} -ErrorAction SilentlyContinue`);
+    console.error(`      if ($process) { Stop-Process -Id $process.OwningProcess -Force }\n`);
+    process.exit(1);
+  } else {
+    console.error('❌ Server error:', error);
+    process.exit(1);
+  }
 });

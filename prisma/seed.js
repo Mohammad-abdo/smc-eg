@@ -2,24 +2,77 @@
 // This script populates the database with initial data for all tables
 // Run with: npm run seed
 
-import prisma from '../lib/prisma.js';
-import bcrypt from 'bcrypt';
+import prisma from "../lib/prisma.js";
+import bcrypt from "bcrypt";
 
 async function main() {
-  console.log('🌱 Starting comprehensive database seed...\n');
-  
+  console.log("🌱 Starting comprehensive database seed...\n");
+
   // Show which database we're connecting to
-  const dbUrl = process.env.DATABASE_URL || 
-    `mysql://${process.env.DB_USER || 'root'}@${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || 3306}/${process.env.DB_NAME || 'smc_dashboard'}`;
-  const dbInfo = dbUrl.includes('railway') ? 'Railway (Remote)' : 
-                 dbUrl.includes('localhost') ? 'Local MySQL' : 'Remote Database';
+  const dbUrl =
+    process.env.DATABASE_URL ||
+    `mysql://${process.env.DB_USER || "root"}@${
+      process.env.DB_HOST || "localhost"
+    }:${process.env.DB_PORT || 3306}/${process.env.DB_NAME || "smc_dashboard"}`;
+  const dbInfo = dbUrl.includes("railway")
+    ? "Railway (Remote)"
+    : dbUrl.includes("localhost")
+    ? "Local MySQL"
+    : "Remote Database";
   console.log(`📊 Connecting to: ${dbInfo}`);
-  console.log(`   Host: ${process.env.DB_HOST || 'localhost'}`);
-  console.log(`   Database: ${process.env.DB_NAME || 'smc_dashboard'}\n`);
+  console.log(`   Host: ${process.env.DB_HOST || "localhost"}`);
+  console.log(`   Database: ${process.env.DB_NAME || "smc_dashboard"}\n`);
 
   try {
+    // Test database connection first
+    console.log("🔌 Testing database connection...");
+    try {
+      await Promise.race([
+        prisma.$queryRaw`SELECT 1 as test`,
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Connection timeout after 15 seconds")),
+            15000
+          )
+        ),
+      ]);
+      console.log("✅ Database connection successful!\n");
+    } catch (connectionError) {
+      console.error("❌ Database connection failed!\n");
+      console.error("Connection Error:", connectionError.message);
+      console.error("\n🔍 Troubleshooting steps:");
+      console.error("1. Verify MySQL/MariaDB is running:");
+      console.error(
+        "   - Windows: Check Services (services.msc) for MySQL service"
+      );
+      console.error(
+        '   - Linux/Mac: Run "sudo systemctl status mysql" or "brew services list"'
+      );
+      console.error("2. Check your .env file has correct credentials:");
+      console.error(`   DB_HOST=${process.env.DB_HOST || "localhost"}`);
+      console.error(`   DB_USER=${process.env.DB_USER || "root"}`);
+      console.error(
+        `   DB_PASSWORD=${process.env.DB_PASSWORD ? "***" : "(not set)"}`
+      );
+      console.error(`   DB_NAME=${process.env.DB_NAME || "smc_dashboard"}`);
+      console.error(`   DB_PORT=${process.env.DB_PORT || "3306"}`);
+      console.error("3. Test connection manually:");
+      console.error(
+        `   mysql -h ${process.env.DB_HOST || "localhost"} -u ${
+          process.env.DB_USER || "root"
+        } -p ${process.env.DB_NAME || "smc_dashboard"}`
+      );
+      console.error("4. Ensure database exists:");
+      console.error(
+        `   CREATE DATABASE IF NOT EXISTS ${
+          process.env.DB_NAME || "smc_dashboard"
+        } CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
+      );
+      throw connectionError;
+    }
+
     // Clear existing data (optional - comment out if you want to keep existing data)
-    console.log('🗑️  Clearing existing data...');
+    console.log("🗑️  Clearing existing data...");
     await prisma.tenderSubmission.deleteMany();
     await prisma.tender.deleteMany();
     await prisma.chatMessage.deleteMany();
@@ -37,72 +90,81 @@ async function main() {
     await prisma.news.deleteMany();
     await prisma.banner.deleteMany();
     await prisma.user.deleteMany();
-    console.log('✅ Existing data cleared\n');
+    console.log("✅ Existing data cleared\n");
 
     // ==================== CREATE USERS ====================
-    console.log('👤 Creating users...');
-    
+    console.log("👤 Creating users...");
+
     // Hash passwords
     const saltRounds = 10;
-    const adminPassword = 'Admin@123'; // Default admin password
-    const editorPassword = 'Editor@123';
-    const viewerPassword = 'Viewer@123';
-    const managerPassword = 'Manager@123';
-    
+    const adminPassword = "Admin@123"; // Default admin password
+    const editorPassword = "Editor@123";
+    const viewerPassword = "Viewer@123";
+    const managerPassword = "Manager@123";
+
     const hashedAdminPassword = await bcrypt.hash(adminPassword, saltRounds);
     const hashedEditorPassword = await bcrypt.hash(editorPassword, saltRounds);
     const hashedViewerPassword = await bcrypt.hash(viewerPassword, saltRounds);
-    const hashedManagerPassword = await bcrypt.hash(managerPassword, saltRounds);
-    
+    const hashedManagerPassword = await bcrypt.hash(
+      managerPassword,
+      saltRounds
+    );
+
     const users = await prisma.user.createMany({
       data: [
         {
-          name: 'Admin User',
-          email: 'admin@smc.com',
+          name: "Admin User",
+          email: "admin@smc.com",
           password: hashedAdminPassword,
-          role: 'admin',
-          status: 'active',
-          permissions: ['read', 'write', 'delete', 'manage_users', 'manage_settings'],
+          role: "admin",
+          status: "active",
+          permissions: [
+            "read",
+            "write",
+            "delete",
+            "manage_users",
+            "manage_settings",
+          ],
         },
         {
-          name: 'Editor User',
-          email: 'editor@smc.com',
+          name: "Editor User",
+          email: "editor@smc.com",
           password: hashedEditorPassword,
-          role: 'editor',
-          status: 'active',
-          permissions: ['read', 'write', 'edit_products', 'edit_news'],
+          role: "editor",
+          status: "active",
+          permissions: ["read", "write", "edit_products", "edit_news"],
         },
         {
-          name: 'Viewer User',
-          email: 'viewer@smc.com',
+          name: "Viewer User",
+          email: "viewer@smc.com",
           password: hashedViewerPassword,
-          role: 'viewer',
-          status: 'active',
-          permissions: ['read'],
+          role: "viewer",
+          status: "active",
+          permissions: ["read"],
         },
         {
-          name: 'Manager User',
-          email: 'manager@smc.com',
+          name: "Manager User",
+          email: "manager@smc.com",
           password: hashedManagerPassword,
-          role: 'admin',
-          status: 'active',
-          permissions: ['read', 'write', 'delete', 'manage_financials'],
+          role: "admin",
+          status: "active",
+          permissions: ["read", "write", "delete", "manage_financials"],
         },
       ],
     });
-    console.log('✅ Users created\n');
-    console.log('📧 ADMIN CREDENTIALS:');
-    console.log('   Email: admin@smc.com');
-    console.log('   Password: Admin@123');
-    console.log('   Role: admin');
-    console.log('   ⚠️  IMPORTANT: Change this password after first login!\n');
-    console.log('📧 OTHER USER CREDENTIALS:');
-    console.log('   Editor: editor@smc.com / Editor@123');
-    console.log('   Viewer: viewer@smc.com / Viewer@123');
-    console.log('   Manager: manager@smc.com / Manager@123\n');
+    console.log("✅ Users created\n");
+    console.log("📧 ADMIN CREDENTIALS:");
+    console.log("   Email: admin@smc.com");
+    console.log("   Password: Admin@123");
+    console.log("   Role: admin");
+    console.log("   ⚠️  IMPORTANT: Change this password after first login!\n");
+    console.log("📧 OTHER USER CREDENTIALS:");
+    console.log("   Editor: editor@smc.com / Editor@123");
+    console.log("   Viewer: viewer@smc.com / Viewer@123");
+    console.log("   Manager: manager@smc.com / Manager@123\n");
 
     // ==================== CREATE PRODUCT CATEGORIES ====================
-    console.log('📦 Creating product categories...');
+    console.log("📦 Creating product categories...");
     await prisma.$queryRaw`
       INSERT INTO product_categories (name, nameAr, slug, \`order\`, status, created_at, updated_at)
       VALUES 
@@ -112,7 +174,7 @@ async function main() {
       ('Agricultural Products', 'المنتجات الزراعية', 'agricultural', 4, 'active', NOW(), NOW()),
       ('Energy Products', 'منتجات الطاقة', 'energy', 5, 'active', NOW(), NOW())
     `;
-    
+
     const categories = await prisma.$queryRaw`
       SELECT * FROM product_categories ORDER BY \`order\` ASC
     `;
@@ -121,62 +183,72 @@ async function main() {
     const constructionCategory = categories[2];
     const agriculturalCategory = categories[3];
     const energyCategory = categories[4];
-    console.log('✅ Product categories created\n');
+    console.log("✅ Product categories created\n");
 
     // ==================== CREATE PRODUCTS ====================
-    console.log('🛍️  Creating products...');
+    console.log("🛍️  Creating products...");
     const spec1 = JSON.stringify({
-      tables: [{
-        title: 'Technical Specifications',
-        columns: ['Model', 'Engine Power', 'Weight', 'Capacity'],
-        rows: [
-          ['EX-5000', '500 HP', '50 tons', '5 m³'],
-          ['EX-3000', '300 HP', '30 tons', '3 m³'],
-          ['EX-2000', '200 HP', '20 tons', '2 m³'],
-        ],
-      }],
+      tables: [
+        {
+          title: "Technical Specifications",
+          columns: ["Model", "Engine Power", "Weight", "Capacity"],
+          rows: [
+            ["EX-5000", "500 HP", "50 tons", "5 m³"],
+            ["EX-3000", "300 HP", "30 tons", "3 m³"],
+            ["EX-2000", "200 HP", "20 tons", "2 m³"],
+          ],
+        },
+      ],
     });
     const spec2 = JSON.stringify({
-      tables: [{
-        title: 'Conveyor Specifications',
-        columns: ['Width', 'Length', 'Speed', 'Load Capacity'],
-        rows: [
-          ['1.2m', '50m', '2 m/s', '500 kg/m'],
-          ['0.8m', '30m', '1.5 m/s', '300 kg/m'],
-          ['0.6m', '20m', '1 m/s', '200 kg/m'],
-        ],
-      }],
+      tables: [
+        {
+          title: "Conveyor Specifications",
+          columns: ["Width", "Length", "Speed", "Load Capacity"],
+          rows: [
+            ["1.2m", "50m", "2 m/s", "500 kg/m"],
+            ["0.8m", "30m", "1.5 m/s", "300 kg/m"],
+            ["0.6m", "20m", "1 m/s", "200 kg/m"],
+          ],
+        },
+      ],
     });
     const spec3 = JSON.stringify({
-      tables: [{
-        title: 'Mixer Specifications',
-        columns: ['Capacity', 'Engine', 'Weight', 'Rotation Speed'],
-        rows: [
-          ['10 m³', '300 HP', '15 tons', '15 RPM'],
-          ['7 m³', '250 HP', '12 tons', '12 RPM'],
-          ['5 m³', '200 HP', '10 tons', '10 RPM'],
-        ],
-      }],
+      tables: [
+        {
+          title: "Mixer Specifications",
+          columns: ["Capacity", "Engine", "Weight", "Rotation Speed"],
+          rows: [
+            ["10 m³", "300 HP", "15 tons", "15 RPM"],
+            ["7 m³", "250 HP", "12 tons", "12 RPM"],
+            ["5 m³", "200 HP", "10 tons", "10 RPM"],
+          ],
+        },
+      ],
     });
     const spec4 = JSON.stringify({
-      tables: [{
-        title: 'Tractor Specifications',
-        columns: ['Model', 'Horsepower', 'Weight', 'Fuel Capacity'],
-        rows: [
-          ['TR-500', '500 HP', '8 tons', '200L'],
-          ['TR-400', '400 HP', '6 tons', '150L'],
-        ],
-      }],
+      tables: [
+        {
+          title: "Tractor Specifications",
+          columns: ["Model", "Horsepower", "Weight", "Fuel Capacity"],
+          rows: [
+            ["TR-500", "500 HP", "8 tons", "200L"],
+            ["TR-400", "400 HP", "6 tons", "150L"],
+          ],
+        },
+      ],
     });
     const spec5 = JSON.stringify({
-      tables: [{
-        title: 'Generator Specifications',
-        columns: ['Power Output', 'Fuel Type', 'Weight', 'Dimensions'],
-        rows: [
-          ['1000 kW', 'Diesel', '5 tons', '4x2x2m'],
-          ['500 kW', 'Diesel', '3 tons', '3x1.5x1.5m'],
-        ],
-      }],
+      tables: [
+        {
+          title: "Generator Specifications",
+          columns: ["Power Output", "Fuel Type", "Weight", "Dimensions"],
+          rows: [
+            ["1000 kW", "Diesel", "5 tons", "4x2x2m"],
+            ["500 kW", "Diesel", "3 tons", "3x1.5x1.5m"],
+          ],
+        },
+      ],
     });
 
     await prisma.$queryRaw`
@@ -188,62 +260,70 @@ async function main() {
       ('Agricultural Tractor', 'جرار زراعي', ${agriculturalCategory.id}, 'Agricultural', 'active', 150, 'Powerful tractor for agricultural operations with advanced GPS navigation', 'جرار قوي للعمليات الزراعية مع نظام GPS متقدم', NULL, NULL, ${spec4}, NOW(), NOW()),
       ('Industrial Generator', 'مولد صناعي', ${energyCategory.id}, 'Energy', 'active', 200, 'High-capacity generator for industrial power supply with automatic backup', 'مولد عالي السعة لإمداد الطاقة الصناعية مع نسخ احتياطي تلقائي', NULL, NULL, ${spec5}, NOW(), NOW())
     `;
-    console.log('✅ Products created\n');
+    console.log("✅ Products created\n");
 
     // ==================== CREATE NEWS ====================
-    console.log('📰 Creating news articles...');
+    console.log("📰 Creating news articles...");
     await prisma.news.createMany({
       data: [
         {
-          title: 'New Product Launch - Heavy Duty Excavator',
-          titleAr: 'إطلاق منتج جديد - حفار ثقيل',
-          date: new Date('2024-12-01'),
-          category: 'Company News',
+          title: "New Product Launch - Heavy Duty Excavator",
+          titleAr: "إطلاق منتج جديد - حفار ثقيل",
+          date: new Date("2024-12-01"),
+          category: "Company News",
           views: 150,
-          status: 'published',
-          content: 'We are excited to announce the launch of our new Heavy Duty Excavator line. This state-of-the-art equipment features advanced hydraulic systems and improved fuel efficiency.',
-          contentAr: 'نحن متحمسون للإعلان عن إطلاق خط حفارنا الثقيل الجديد. تتميز هذه المعدات المتطورة بأنظمة هيدروليكية متقدمة وكفاءة وقود محسنة.',
+          status: "published",
+          content:
+            "We are excited to announce the launch of our new Heavy Duty Excavator line. This state-of-the-art equipment features advanced hydraulic systems and improved fuel efficiency.",
+          contentAr:
+            "نحن متحمسون للإعلان عن إطلاق خط حفارنا الثقيل الجديد. تتميز هذه المعدات المتطورة بأنظمة هيدروليكية متقدمة وكفاءة وقود محسنة.",
           image: null,
         },
         {
-          title: 'Industry Conference 2024 - Success Story',
-          titleAr: 'مؤتمر الصناعة 2024 - قصة نجاح',
-          date: new Date('2024-11-15'),
-          category: 'Events',
+          title: "Industry Conference 2024 - Success Story",
+          titleAr: "مؤتمر الصناعة 2024 - قصة نجاح",
+          date: new Date("2024-11-15"),
+          category: "Events",
           views: 220,
-          status: 'published',
-          content: 'Join us at the annual industry conference where we showcased our latest innovations and connected with industry leaders from around the world.',
-          contentAr: 'انضم إلينا في مؤتمر الصناعة السنوي حيث عرضنا أحدث ابتكاراتنا وتواصلنا مع قادة الصناعة من جميع أنحاء العالم.',
+          status: "published",
+          content:
+            "Join us at the annual industry conference where we showcased our latest innovations and connected with industry leaders from around the world.",
+          contentAr:
+            "انضم إلينا في مؤتمر الصناعة السنوي حيث عرضنا أحدث ابتكاراتنا وتواصلنا مع قادة الصناعة من جميع أنحاء العالم.",
           image: null,
         },
         {
-          title: 'Partnership Announcement with Global Mining Co.',
-          titleAr: 'إعلان شراكة مع شركة التعدين العالمية',
-          date: new Date('2024-10-20'),
-          category: 'Partnerships',
+          title: "Partnership Announcement with Global Mining Co.",
+          titleAr: "إعلان شراكة مع شركة التعدين العالمية",
+          date: new Date("2024-10-20"),
+          category: "Partnerships",
           views: 180,
-          status: 'published',
-          content: 'We are proud to announce our strategic partnership with Global Mining Co. to expand our operations and serve more customers worldwide.',
-          contentAr: 'نفخر بالإعلان عن شراكتنا الاستراتيجية مع شركة التعدين العالمية لتوسيع عملياتنا وخدمة المزيد من العملاء في جميع أنحاء العالم.',
+          status: "published",
+          content:
+            "We are proud to announce our strategic partnership with Global Mining Co. to expand our operations and serve more customers worldwide.",
+          contentAr:
+            "نفخر بالإعلان عن شراكتنا الاستراتيجية مع شركة التعدين العالمية لتوسيع عملياتنا وخدمة المزيد من العملاء في جميع أنحاء العالم.",
           image: null,
         },
         {
-          title: 'Sustainability Initiative Launch',
-          titleAr: 'إطلاق مبادرة الاستدامة',
-          date: new Date('2024-09-10'),
-          category: 'Sustainability',
+          title: "Sustainability Initiative Launch",
+          titleAr: "إطلاق مبادرة الاستدامة",
+          date: new Date("2024-09-10"),
+          category: "Sustainability",
           views: 95,
-          status: 'published',
-          content: 'Our new sustainability initiative focuses on reducing carbon emissions and promoting eco-friendly manufacturing processes.',
-          contentAr: 'تركز مبادرة الاستدامة الجديدة على تقليل انبعاثات الكربون وتعزيز عمليات التصنيع الصديقة للبيئة.',
+          status: "published",
+          content:
+            "Our new sustainability initiative focuses on reducing carbon emissions and promoting eco-friendly manufacturing processes.",
+          contentAr:
+            "تركز مبادرة الاستدامة الجديدة على تقليل انبعاثات الكربون وتعزيز عمليات التصنيع الصديقة للبيئة.",
           image: null,
         },
       ],
     });
-    console.log('✅ News articles created\n');
+    console.log("✅ News articles created\n");
 
     // ==================== CREATE BANNERS ====================
-    console.log('🎨 Creating banners...');
+    console.log("🎨 Creating banners...");
     await prisma.$queryRaw`
       INSERT INTO banners (image, title, titleAr, subtitle, subtitleAr, description, descriptionAr, \`order\`, active, created_at, updated_at)
       VALUES 
@@ -251,10 +331,10 @@ async function main() {
       (NULL, 'Quality Products', 'منتجات عالية الجودة', 'Built to Last', 'مصممة لتدوم', 'Premium quality products for your business needs with international standards', 'منتجات عالية الجودة لاحتياجات عملك مع معايير دولية', 2, true, NOW(), NOW()),
       (NULL, 'Innovation & Excellence', 'الابتكار والتميز', 'Technology First', 'التكنولوجيا أولاً', 'Cutting-edge technology and innovative solutions for modern industries', 'تكنولوجيا متطورة وحلول مبتكرة للصناعات الحديثة', 3, true, NOW(), NOW())
     `;
-    console.log('✅ Banners created\n');
+    console.log("✅ Banners created\n");
 
     // ==================== CREATE MEMBERS ====================
-    console.log('👥 Creating board members...');
+    console.log("👥 Creating board members...");
     await prisma.$queryRaw`
       INSERT INTO members (name, nameAr, title, titleAr, \`order\`, status, created_at, updated_at)
       VALUES 
@@ -264,10 +344,10 @@ async function main() {
       ('Sarah Johnson', 'سارة جونسون', 'COO', 'مدير العمليات', 4, 'active', NOW(), NOW()),
       ('Mohammed Hassan', 'محمد حسن', 'VP Sales', 'نائب رئيس المبيعات', 5, 'active', NOW(), NOW())
     `;
-    console.log('✅ Board members created\n');
+    console.log("✅ Board members created\n");
 
     // ==================== CREATE CLIENTS ====================
-    console.log('🏢 Creating clients...');
+    console.log("🏢 Creating clients...");
     await prisma.$queryRaw`
       INSERT INTO clients (name, nameAr, logo, website, \`order\`, status, created_at, updated_at)
       VALUES 
@@ -278,298 +358,498 @@ async function main() {
       ('Construction Partners Inc.', 'شركاء البناء', NULL, 'https://constructionpartners.com', 5, 'active', NOW(), NOW()),
       ('Energy Systems Group', 'مجموعة أنظمة الطاقة', NULL, 'https://energysystems.com', 6, 'active', NOW(), NOW())
     `;
-    console.log('✅ Clients created\n');
+    console.log("✅ Clients created\n");
 
     // ==================== CREATE TENDERS ====================
-    console.log('📋 Creating tenders...');
+    console.log("📋 Creating tenders...");
     const tenders = await prisma.tender.createMany({
       data: [
         {
-          title: 'Mining Equipment Supply Tender',
-          titleAr: 'مناقصة توريد معدات التعدين',
-          category: 'Mining',
-          deadline: new Date('2025-01-31'),
-          description: 'Supply of heavy-duty mining equipment including excavators, loaders, and drilling machines.',
-          descriptionAr: 'توريد معدات التعدين الثقيلة بما في ذلك الحفارات واللوادر وآلات الحفر.',
-          status: 'active',
+          title: "Mining Equipment Supply Tender",
+          titleAr: "مناقصة توريد معدات التعدين",
+          category: "Mining",
+          deadline: new Date("2025-01-31"),
+          description:
+            "Supply of heavy-duty mining equipment including excavators, loaders, and drilling machines.",
+          descriptionAr:
+            "توريد معدات التعدين الثقيلة بما في ذلك الحفارات واللوادر وآلات الحفر.",
+          status: "active",
           documentFile: null,
           documentFileName: null,
         },
         {
-          title: 'Industrial Conveyor System Installation',
-          titleAr: 'تركيب نظام الناقل الصناعي',
-          category: 'Industrial',
-          deadline: new Date('2025-02-15'),
-          description: 'Installation and commissioning of industrial conveyor belt systems for manufacturing facilities.',
-          descriptionAr: 'تركيب وتشغيل أنظمة السيور الناقلة الصناعية للمنشآت التصنيعية.',
-          status: 'active',
+          title: "Industrial Conveyor System Installation",
+          titleAr: "تركيب نظام الناقل الصناعي",
+          category: "Industrial",
+          deadline: new Date("2025-02-15"),
+          description:
+            "Installation and commissioning of industrial conveyor belt systems for manufacturing facilities.",
+          descriptionAr:
+            "تركيب وتشغيل أنظمة السيور الناقلة الصناعية للمنشآت التصنيعية.",
+          status: "active",
           documentFile: null,
           documentFileName: null,
         },
         {
-          title: 'Construction Machinery Rental',
-          titleAr: 'إيجار معدات البناء',
-          category: 'Construction',
-          deadline: new Date('2025-03-01'),
-          description: 'Long-term rental of construction machinery including cranes, mixers, and excavators.',
-          descriptionAr: 'إيجار طويل الأجل لمعدات البناء بما في ذلك الرافعات والخلاطات والحفارات.',
-          status: 'active',
+          title: "Construction Machinery Rental",
+          titleAr: "إيجار معدات البناء",
+          category: "Construction",
+          deadline: new Date("2025-03-01"),
+          description:
+            "Long-term rental of construction machinery including cranes, mixers, and excavators.",
+          descriptionAr:
+            "إيجار طويل الأجل لمعدات البناء بما في ذلك الرافعات والخلاطات والحفارات.",
+          status: "active",
           documentFile: null,
           documentFileName: null,
         },
       ],
     });
     const createdTenders = await prisma.tender.findMany();
-    console.log('✅ Tenders created\n');
+    console.log("✅ Tenders created\n");
 
     // ==================== CREATE TENDER SUBMISSIONS ====================
-    console.log('📝 Creating tender submissions...');
+    console.log("📝 Creating tender submissions...");
     if (createdTenders.length > 0) {
       await prisma.tenderSubmission.createMany({
         data: [
           {
             tenderId: createdTenders[0].id,
-            companyName: 'Mining Solutions Inc.',
-            contactName: 'Robert Brown',
-            email: 'robert@miningsolutions.com',
-            phone: '+1-555-0101',
+            companyName: "Mining Solutions Inc.",
+            contactName: "Robert Brown",
+            email: "robert@miningsolutions.com",
+            phone: "+1-555-0101",
             files: null,
-            status: 'pending',
+            status: "pending",
           },
           {
             tenderId: createdTenders[0].id,
-            companyName: 'Heavy Equipment Co.',
-            contactName: 'Lisa White',
-            email: 'lisa@heavyeq.com',
-            phone: '+1-555-0102',
+            companyName: "Heavy Equipment Co.",
+            contactName: "Lisa White",
+            email: "lisa@heavyeq.com",
+            phone: "+1-555-0102",
             files: null,
-            status: 'under_review',
+            status: "under_review",
           },
           {
             tenderId: createdTenders[1].id,
-            companyName: 'Industrial Systems Ltd.',
-            contactName: 'David Green',
-            email: 'david@industrialsys.com',
-            phone: '+1-555-0103',
+            companyName: "Industrial Systems Ltd.",
+            contactName: "David Green",
+            email: "david@industrialsys.com",
+            phone: "+1-555-0103",
             files: null,
-            status: 'pending',
+            status: "pending",
           },
         ],
       });
     }
-    console.log('✅ Tender submissions created\n');
+    console.log("✅ Tender submissions created\n");
 
     // ==================== CREATE CONTACTS ====================
-    console.log('📧 Creating contact messages...');
+    console.log("📧 Creating contact messages...");
     await prisma.contact.createMany({
       data: [
         {
-          name: 'John Customer',
-          email: 'john.customer@email.com',
-          phone: '+1-555-1001',
-          message: 'I am interested in your mining equipment. Can you provide more information?',
-          status: 'new',
+          name: "John Customer",
+          email: "john.customer@email.com",
+          phone: "+1-555-1001",
+          message:
+            "I am interested in your mining equipment. Can you provide more information?",
+          status: "new",
           date: new Date(),
         },
         {
-          name: 'Maria Garcia',
-          email: 'maria.garcia@email.com',
-          phone: '+1-555-1002',
-          message: 'Looking for industrial conveyor systems for our new facility.',
-          status: 'read',
-          date: new Date('2024-11-20'),
+          name: "Maria Garcia",
+          email: "maria.garcia@email.com",
+          phone: "+1-555-1002",
+          message:
+            "Looking for industrial conveyor systems for our new facility.",
+          status: "read",
+          date: new Date("2024-11-20"),
         },
         {
-          name: 'Ahmed Ibrahim',
-          email: 'ahmed.ibrahim@email.com',
-          phone: '+20-100-1234567',
-          message: 'Need quotation for construction machinery rental.',
-          status: 'new',
+          name: "Ahmed Ibrahim",
+          email: "ahmed.ibrahim@email.com",
+          phone: "+20-100-1234567",
+          message: "Need quotation for construction machinery rental.",
+          status: "new",
           date: new Date(),
         },
         {
-          name: 'Sarah Wilson',
-          email: 'sarah.wilson@email.com',
-          phone: '+1-555-1004',
-          message: 'Interested in partnership opportunities.',
-          status: 'read',
-          date: new Date('2024-11-15'),
+          name: "Sarah Wilson",
+          email: "sarah.wilson@email.com",
+          phone: "+1-555-1004",
+          message: "Interested in partnership opportunities.",
+          status: "read",
+          date: new Date("2024-11-15"),
         },
       ],
     });
-    console.log('✅ Contact messages created\n');
+    console.log("✅ Contact messages created\n");
 
     // ==================== CREATE COMPLAINTS ====================
-    console.log('⚠️  Creating complaints...');
+    console.log("⚠️  Creating complaints...");
     await prisma.complaint.createMany({
       data: [
         {
-          name: 'Customer Service Issue',
-          email: 'customer@email.com',
-          subject: 'Delivery Delay',
-          message: 'My order was delayed by two weeks. Please investigate.',
-          status: 'pending',
+          name: "Customer Service Issue",
+          email: "customer@email.com",
+          subject: "Delivery Delay",
+          message: "My order was delayed by two weeks. Please investigate.",
+          status: "pending",
           date: new Date(),
         },
         {
-          name: 'Quality Concern',
-          email: 'quality@email.com',
-          subject: 'Product Quality',
-          message: 'Received product with minor defects. Need replacement.',
-          status: 'in-progress',
-          date: new Date('2024-11-25'),
+          name: "Quality Concern",
+          email: "quality@email.com",
+          subject: "Product Quality",
+          message: "Received product with minor defects. Need replacement.",
+          status: "in-progress",
+          date: new Date("2024-11-25"),
         },
         {
-          name: 'Billing Issue',
-          email: 'billing@email.com',
-          subject: 'Invoice Error',
-          message: 'Incorrect amount charged on invoice #12345.',
-          status: 'resolved',
-          date: new Date('2024-11-10'),
+          name: "Billing Issue",
+          email: "billing@email.com",
+          subject: "Invoice Error",
+          message: "Incorrect amount charged on invoice #12345.",
+          status: "resolved",
+          date: new Date("2024-11-10"),
         },
       ],
     });
-    console.log('✅ Complaints created\n');
+    console.log("✅ Complaints created\n");
 
     // ==================== CREATE CHAT MESSAGES ====================
-    console.log('💬 Creating chat messages...');
+    console.log("💬 Creating chat messages...");
     await prisma.chatMessage.createMany({
       data: [
         {
-          name: 'Online Customer',
-          email: 'customer1@email.com',
-          message: 'Hello, I need help with product selection.',
-          reply: 'Hello! I would be happy to help you choose the right product. What are your requirements?',
-          status: 'replied',
+          name: "Online Customer",
+          email: "customer1@email.com",
+          message: "Hello, I need help with product selection.",
+          reply:
+            "Hello! I would be happy to help you choose the right product. What are your requirements?",
+          status: "replied",
           timestamp: new Date(),
         },
         {
-          name: 'Inquiry User',
-          email: 'inquiry@email.com',
-          message: 'What is the warranty period for your products?',
+          name: "Inquiry User",
+          email: "inquiry@email.com",
+          message: "What is the warranty period for your products?",
           reply: null,
-          status: 'pending',
+          status: "pending",
           timestamp: new Date(),
         },
         {
-          name: 'Support Request',
-          email: 'support@email.com',
-          message: 'Need technical support for equipment installation.',
-          reply: 'Our technical team will contact you within 24 hours.',
-          status: 'replied',
-          timestamp: new Date('2024-11-28'),
+          name: "Support Request",
+          email: "support@email.com",
+          message: "Need technical support for equipment installation.",
+          reply: "Our technical team will contact you within 24 hours.",
+          status: "replied",
+          timestamp: new Date("2024-11-28"),
         },
       ],
     });
-    console.log('✅ Chat messages created\n');
+    console.log("✅ Chat messages created\n");
 
     // ==================== CREATE FINANCIAL DATA ====================
-    console.log('💰 Creating financial data...');
+    console.log("💰 Creating financial data...");
     await prisma.financialRevenue.createMany({
       data: [
-        { year: '2021', revenue: 50000000, profit: 10000000 },
-        { year: '2022', revenue: 60000000, profit: 12000000 },
-        { year: '2023', revenue: 70000000, profit: 15000000 },
-        { year: '2024', revenue: 78000000, profit: 18000000 },
+        { year: "2021", revenue: 50000000, profit: 10000000 },
+        { year: "2022", revenue: 60000000, profit: 12000000 },
+        { year: "2023", revenue: 70000000, profit: 15000000 },
+        { year: "2024", revenue: 78000000, profit: 18000000 },
       ],
     });
 
     await prisma.financialProduction.createMany({
       data: [
-        { month: 'January', production: 5000, target: 6000 },
-        { month: 'February', production: 5500, target: 6000 },
-        { month: 'March', production: 6000, target: 6000 },
-        { month: 'April', production: 5800, target: 6000 },
-        { month: 'May', production: 6200, target: 6000 },
-        { month: 'June', production: 6100, target: 6000 },
-        { month: 'July', production: 5900, target: 6000 },
-        { month: 'August', production: 6300, target: 6000 },
-        { month: 'September', production: 6000, target: 6000 },
-        { month: 'October', production: 5800, target: 6000 },
-        { month: 'November', production: 6200, target: 6000 },
-        { month: 'December', production: 6100, target: 6000 },
+        { month: "January", production: 5000, target: 6000 },
+        { month: "February", production: 5500, target: 6000 },
+        { month: "March", production: 6000, target: 6000 },
+        { month: "April", production: 5800, target: 6000 },
+        { month: "May", production: 6200, target: 6000 },
+        { month: "June", production: 6100, target: 6000 },
+        { month: "July", production: 5900, target: 6000 },
+        { month: "August", production: 6300, target: 6000 },
+        { month: "September", production: 6000, target: 6000 },
+        { month: "October", production: 5800, target: 6000 },
+        { month: "November", production: 6200, target: 6000 },
+        { month: "December", production: 6100, target: 6000 },
       ],
     });
 
     await prisma.financialExport.createMany({
       data: [
-        { name: 'Europe', value: 35.5, color: '#204393' },
-        { name: 'Asia', value: 28.3, color: '#4CAF50' },
-        { name: 'Africa', value: 20.1, color: '#FF9800' },
-        { name: 'Americas', value: 16.1, color: '#F44336' },
+        { name: "Europe", value: 35.5, color: "#204393" },
+        { name: "Asia", value: 28.3, color: "#4CAF50" },
+        { name: "Africa", value: 20.1, color: "#FF9800" },
+        { name: "Americas", value: 16.1, color: "#F44336" },
       ],
     });
-    console.log('✅ Financial data created\n');
+    console.log("✅ Financial data created\n");
 
     // ==================== CREATE SITE SETTINGS ====================
-    console.log('⚙️  Creating site settings...');
+    console.log("⚙️  Creating site settings...");
+
+    // Phone numbers structure
+    const salesPhones = JSON.stringify([
+      { number: "25740005", type: "phone" },
+      { number: "25740217", type: "phone" },
+      { number: "257401096", type: "phone" },
+      { number: "25764458", type: "phone" },
+      { number: "2579429", type: "phone" },
+      { number: "00201282055059", type: "phone" },
+      { number: "00201099899572", type: "phone" },
+      { number: "00201099899389", type: "phone" },
+    ]);
+
+    const adminPhones = JSON.stringify([
+      { number: "51702505", type: "phone" },
+      { number: "51702557", type: "phone" },
+      { number: "51705202", type: "phone" },
+    ]);
+
+    const faxNumbers = JSON.stringify([
+      { number: "25740006", type: "fax", label: "Main Fax" },
+      { number: "25740218", type: "fax", label: "Sales Fax" },
+    ]);
+
     await prisma.siteSetting.createMany({
       data: [
-        { key: 'company_name', valueEn: 'SMC Digital Suite', valueAr: 'SMC الحلول الرقمية' },
-        { key: 'company_email', valueEn: 'info@smc.com', valueAr: 'info@smc.com' },
-        { key: 'company_phone', valueEn: '+1-234-567-8900', valueAr: '+1-234-567-8900' },
-        { key: 'company_address', valueEn: '123 Main Street, City, Country', valueAr: '123 الشارع الرئيسي، المدينة، البلد' },
-        { key: 'company_website', valueEn: 'https://www.smc.com', valueAr: 'https://www.smc.com' },
-        { key: 'facebook_url', valueEn: 'https://facebook.com/smc', valueAr: 'https://facebook.com/smc' },
-        { key: 'twitter_url', valueEn: 'https://twitter.com/smc', valueAr: 'https://twitter.com/smc' },
-        { key: 'linkedin_url', valueEn: 'https://linkedin.com/company/smc', valueAr: 'https://linkedin.com/company/smc' },
+        {
+          key: "company_name",
+          valueEn: "Sinai Manganese Co.",
+          valueAr: "شركة سيناء للمنجنيز",
+        },
+        {
+          key: "company_email",
+          valueEn: "info@smc-eg.com",
+          valueAr: "info@smc-eg.com",
+        },
+        {
+          key: "company_phone",
+          valueEn: "25740005 / 25740217",
+          valueAr: "25740005 / 25740217",
+        },
+        {
+          key: "company_address",
+          valueEn: "Abu Zenima – South Sinai, Egypt",
+          valueAr: "أبو زنيمة – جنوب سيناء، مصر",
+        },
+        {
+          key: "company_address_cairo",
+          valueEn: "1 Kasr El-Nile St., Cairo – Egypt",
+          valueAr: "1 شارع قصر النيل، القاهرة – مصر",
+        },
+        {
+          key: "company_website",
+          valueEn: "https://www.smc-eg.com",
+          valueAr: "https://www.smc-eg.com",
+        },
+        {
+          key: "facebook_url",
+          valueEn: "https://www.facebook.com/share/p/1QWB8WE7ZS/",
+          valueAr: "https://www.facebook.com/share/p/1QWB8WE7ZS/",
+        },
+        {
+          key: "twitter_url",
+          valueEn: "",
+          valueAr: "",
+        },
+        {
+          key: "linkedin_url",
+          valueEn: "",
+          valueAr: "",
+        },
+        {
+          key: "phone_numbers_sales",
+          valueEn: salesPhones,
+          valueAr: salesPhones,
+        },
+        {
+          key: "phone_numbers_admin",
+          valueEn: adminPhones,
+          valueAr: adminPhones,
+        },
+        {
+          key: "fax_numbers",
+          valueEn: faxNumbers,
+          valueAr: faxNumbers,
+        },
       ],
     });
-    console.log('✅ Site settings created\n');
+    console.log("✅ Site settings created\n");
 
     // ==================== CREATE PAGE CONTENT ====================
-    console.log('📄 Creating page content...');
+    console.log("📄 Creating page content...");
     await prisma.pageContent.createMany({
       data: [
+        // Home page content
         {
-          page: 'about',
-          key: 'title',
-          valueEn: 'About Us',
-          valueAr: 'من نحن',
+          page: "home",
+          key: "heroTitle",
+          valueEn: "Sinai Manganese Co.",
+          valueAr: "شركة سيناء للمنجنيز",
         },
         {
-          page: 'about',
-          key: 'description',
-          valueEn: 'We are a leading provider of industrial and mining solutions with over 20 years of experience in the industry.',
-          valueAr: 'نحن مزود رائد للحلول الصناعية والتعدينية مع أكثر من 20 عاماً من الخبرة في الصناعة.',
+          page: "home",
+          key: "heroSubtitle",
+          valueEn: "First and Largest Producer of Manganese Ore in Egypt",
+          valueAr: "أول وأكبر منتج لخام المنجنيز في مصر",
         },
         {
-          page: 'about',
-          key: 'mission',
-          valueEn: 'Our mission is to deliver high-quality products and services that exceed customer expectations.',
-          valueAr: 'مهمتنا هي تقديم منتجات وخدمات عالية الجودة تتجاوز توقعات العملاء.',
+          page: "home",
+          key: "heroDescription",
+          valueEn:
+            "Sinai Manganese Co. SMC was founded on May 18th, 1957, to exploit the manganese deposits in Sinai Peninsula, Egypt.",
+          valueAr:
+            "تأسست شركة سيناء للمنجنيز في 18 مايو 1957 لاستغلال رواسب المنجنيز في شبه جزيرة سيناء، مصر.",
         },
         {
-          page: 'contact',
-          key: 'title',
-          valueEn: 'Contact Us',
-          valueAr: 'اتصل بنا',
+          page: "home",
+          key: "productsSectionLabel",
+          valueEn: "Our Products",
+          valueAr: "منتجاتنا",
         },
         {
-          page: 'contact',
-          key: 'description',
-          valueEn: 'Get in touch with our team. We are here to help you with all your needs.',
-          valueAr: 'تواصل مع فريقنا. نحن هنا لمساعدتك في جميع احتياجاتك.',
+          page: "home",
+          key: "productsSectionTitle",
+          valueEn: "Industrial & Mining Products",
+          valueAr: "المنتجات الصناعية والتعدينية",
         },
         {
-          page: 'home',
-          key: 'welcome_title',
-          valueEn: 'Welcome to SMC',
-          valueAr: 'مرحباً بكم في SMC',
+          page: "home",
+          key: "productsSectionSubtitle",
+          valueEn: "High-quality products for various industries",
+          valueAr: "منتجات عالية الجودة لمختلف الصناعات",
         },
         {
-          page: 'home',
-          key: 'welcome_message',
-          valueEn: 'Your trusted partner for industrial and mining solutions.',
-          valueAr: 'شريكك الموثوق للحلول الصناعية والتعدينية.',
+          page: "home",
+          key: "clientsSectionLabel",
+          valueEn: "Our Clients",
+          valueAr: "عملاؤنا",
+        },
+        {
+          page: "home",
+          key: "clientsSectionTitle",
+          valueEn: "Our Success Partners",
+          valueAr: "شركاؤنا في النجاح",
+        },
+        {
+          page: "home",
+          key: "clientsSectionDescription",
+          valueEn:
+            "We are proud of our partnerships with industry-leading companies",
+          valueAr: "نفتخر بشراكاتنا مع الشركات الرائدة في الصناعة",
+        },
+        // About page content
+        {
+          page: "about",
+          key: "title",
+          valueEn: "About Us",
+          valueAr: "من نحن",
+        },
+        {
+          page: "about",
+          key: "description",
+          valueEn:
+            "SMC produces both high and low grades of manganese ore and operates an electrical furnace at Abu-Zinima, Sinai.",
+          valueAr:
+            "تنتج شركة سيناء للمنجنيز درجات عالية ومنخفضة من خام المنجنيز وتدير فرناً كهربائياً في أبو زنيمة، سيناء.",
+        },
+        {
+          page: "about",
+          key: "mission",
+          valueEn: "Our Mission",
+          valueAr: "مهمتنا",
+        },
+        {
+          page: "about",
+          key: "missionText",
+          valueEn:
+            "To be the leading producer of manganese products in Egypt and the region.",
+          valueAr: "أن نكون المنتج الرائد لمنتجات المنجنيز في مصر والمنطقة.",
+        },
+        {
+          page: "about",
+          key: "vision",
+          valueEn: "Our Vision",
+          valueAr: "رؤيتنا",
+        },
+        {
+          page: "about",
+          key: "visionText",
+          valueEn:
+            "To expand our operations and serve more industries globally.",
+          valueAr: "توسيع عملياتنا وخدمة المزيد من الصناعات عالمياً.",
+        },
+        {
+          page: "about",
+          key: "values",
+          valueEn: "Our Values",
+          valueAr: "قيمنا",
+        },
+        {
+          page: "about",
+          key: "valuesText",
+          valueEn: "Quality, Innovation, Sustainability, and Excellence.",
+          valueAr: "الجودة، الابتكار، الاستدامة، والتميز.",
+        },
+        // Contact page content
+        {
+          page: "contact",
+          key: "title",
+          valueEn: "Contact Us",
+          valueAr: "اتصل بنا",
+        },
+        {
+          page: "contact",
+          key: "subtitle",
+          valueEn: "Get in touch with us",
+          valueAr: "تواصل معنا",
+        },
+        {
+          page: "contact",
+          key: "formTitle",
+          valueEn: "Send us a message",
+          valueAr: "أرسل لنا رسالة",
+        },
+        {
+          page: "contact",
+          key: "formSubtitle",
+          valueEn: "We will get back to you as soon as possible",
+          valueAr: "سنتواصل معك في أقرب وقت ممكن",
+        },
+        // Footer content
+        {
+          page: "footer",
+          key: "description",
+          valueEn:
+            "Sinai Manganese Co. is Egypt's first and largest manganese ore producer.",
+          valueAr:
+            "شركة سيناء للمنجنيز هي أول وأكبر منتج لخام المنجنيز في مصر.",
+        },
+        {
+          page: "footer",
+          key: "quickLinks",
+          valueEn: "Quick Links",
+          valueAr: "روابط سريعة",
+        },
+        {
+          page: "footer",
+          key: "followUs",
+          valueEn: "Follow Us",
+          valueAr: "تابعنا",
         },
       ],
     });
-    console.log('✅ Page content created\n');
+    console.log("✅ Page content created\n");
 
     // ==================== SUMMARY ====================
-    console.log('✅ Database seed completed successfully!\n');
-    console.log('📊 Summary:');
+    console.log("✅ Database seed completed successfully!\n");
+    console.log("📊 Summary:");
     console.log(`   - ${await prisma.user.count()} users`);
     console.log(`   - ${await prisma.productCategory.count()} categories`);
     console.log(`   - ${await prisma.product.count()} products`);
@@ -578,55 +858,66 @@ async function main() {
     console.log(`   - ${await prisma.member.count()} board members`);
     console.log(`   - ${await prisma.client.count()} clients`);
     console.log(`   - ${await prisma.tender.count()} tenders`);
-    console.log(`   - ${await prisma.tenderSubmission.count()} tender submissions`);
+    console.log(
+      `   - ${await prisma.tenderSubmission.count()} tender submissions`
+    );
     console.log(`   - ${await prisma.contact.count()} contact messages`);
     console.log(`   - ${await prisma.complaint.count()} complaints`);
     console.log(`   - ${await prisma.chatMessage.count()} chat messages`);
-    console.log(`   - ${await prisma.financialRevenue.count()} revenue records`);
-    console.log(`   - ${await prisma.financialProduction.count()} production records`);
+    console.log(
+      `   - ${await prisma.financialRevenue.count()} revenue records`
+    );
+    console.log(
+      `   - ${await prisma.financialProduction.count()} production records`
+    );
     console.log(`   - ${await prisma.financialExport.count()} export records`);
     console.log(`   - ${await prisma.siteSetting.count()} site settings`);
-    console.log(`   - ${await prisma.pageContent.count()} page content items\n`);
-    
-    console.log('🔐 ADMIN CREDENTIALS:');
-    console.log('   Email: admin@smc.com');
-    console.log('   Password: Admin@123');
-    console.log('   Role: admin');
-    console.log('   Status: active');
-    console.log('   Permissions: read, write, delete, manage_users, manage_settings');
-    console.log('   ⚠️  IMPORTANT: Change this password after first login!\n');
-    console.log('📧 OTHER USER CREDENTIALS:');
-    console.log('   Editor: editor@smc.com / Editor@123');
-    console.log('   Viewer: viewer@smc.com / Viewer@123');
-    console.log('   Manager: manager@smc.com / Manager@123\n');
-    
+    console.log(
+      `   - ${await prisma.pageContent.count()} page content items\n`
+    );
+
+    console.log("🔐 ADMIN CREDENTIALS:");
+    console.log("   Email: admin@smc.com");
+    console.log("   Password: Admin@123");
+    console.log("   Role: admin");
+    console.log("   Status: active");
+    console.log(
+      "   Permissions: read, write, delete, manage_users, manage_settings"
+    );
+    console.log("   ⚠️  IMPORTANT: Change this password after first login!\n");
+    console.log("📧 OTHER USER CREDENTIALS:");
+    console.log("   Editor: editor@smc.com / Editor@123");
+    console.log("   Viewer: viewer@smc.com / Viewer@123");
+    console.log("   Manager: manager@smc.com / Manager@123\n");
+
     // Verify data was actually inserted
-    console.log('🔍 Verifying data was inserted...');
+    console.log("🔍 Verifying data was inserted...");
     const userCount = await prisma.user.count();
     const categoryCount = await prisma.productCategory.count();
     const productCount = await prisma.product.count();
-    
+
     console.log(`   Users in database: ${userCount}`);
     console.log(`   Categories in database: ${categoryCount}`);
     console.log(`   Products in database: ${productCount}`);
-    
+
     if (userCount === 0) {
-      console.error('⚠️  WARNING: No users found in database after seeding!');
-      console.error('   The seed script may have run against a different database.');
+      console.error("⚠️  WARNING: No users found in database after seeding!");
+      console.error(
+        "   The seed script may have run against a different database."
+      );
     } else {
-      console.log('✅ Data verification successful!\n');
+      console.log("✅ Data verification successful!\n");
     }
-    
   } catch (error) {
-    console.error('❌ Error during seeding:', error);
-    console.error('Stack trace:', error.stack);
+    console.error("❌ Error during seeding:", error);
+    console.error("Stack trace:", error.stack);
     throw error;
   }
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Error seeding database:', e);
+    console.error("❌ Error seeding database:", e);
     process.exit(1);
   })
   .finally(async () => {

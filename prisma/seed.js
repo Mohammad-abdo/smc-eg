@@ -593,27 +593,26 @@ async function main() {
     // ==================== CREATE SITE SETTINGS ====================
     console.log("⚙️  Creating site settings...");
 
-    // Phone numbers structure
+    // Phone numbers structure - Organized by Sales and Administration
+    // Sales Numbers
     const salesPhones = JSON.stringify([
-      { number: "25740005", type: "phone" },
-      { number: "25740217", type: "phone" },
-      { number: "257401096", type: "phone" },
-      { number: "25764458", type: "phone" },
-      { number: "2579429", type: "phone" },
-      { number: "00201282055059", type: "phone" },
-      { number: "00201099899572", type: "phone" },
-      { number: "00201099899389", type: "phone" },
+      { number: "01282055059", type: "phone" },
+      { number: "01033528821", type: "phone" },
+      { number: "01099791439", type: "phone" },
     ]);
-
+    
+    const salesFax = JSON.stringify([
+      { number: "25786591", type: "fax", label: "Sales Fax" },
+    ]);
+    
+    // Administration Numbers
     const adminPhones = JSON.stringify([
-      { number: "51702505", type: "phone" },
-      { number: "51702557", type: "phone" },
-      { number: "51705202", type: "phone" },
+      { number: "25740217", type: "phone" },
+      { number: "25741096", type: "phone" },
     ]);
-
-    const faxNumbers = JSON.stringify([
-      { number: "25740006", type: "fax", label: "Main Fax" },
-      { number: "25740218", type: "fax", label: "Sales Fax" },
+    
+    const adminFax = JSON.stringify([
+      { number: "25740142", type: "fax", label: "Administration Fax" },
     ]);
 
     await prisma.siteSetting.createMany({
@@ -669,14 +668,24 @@ async function main() {
           valueAr: salesPhones,
         },
         {
+          key: "fax_numbers_sales",
+          valueEn: salesFax,
+          valueAr: salesFax,
+        },
+        {
           key: "phone_numbers_admin",
           valueEn: adminPhones,
           valueAr: adminPhones,
         },
         {
-          key: "fax_numbers",
-          valueEn: faxNumbers,
-          valueAr: faxNumbers,
+          key: "fax_numbers_admin",
+          valueEn: adminFax,
+          valueAr: adminFax,
+        },
+        {
+          key: "complaints_email",
+          valueEn: "info1@smc-eg.com",
+          valueAr: "info1@smc-eg.com",
         },
       ],
     });

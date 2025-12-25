@@ -114,7 +114,7 @@ model Complaint {
 // Banners Model
 model Banner {
   id          Int      @id @default(autoincrement())
-  image       String?  @db.Text
+  image       String?  @db.LongText
   title       String?  @db.VarChar(255)
   titleAr     String?  @db.VarChar(255)
   subtitle    String?  @db.VarChar(255)

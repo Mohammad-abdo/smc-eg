@@ -10,6 +10,7 @@ import apiRoutes from './src/routes/index.js';
 import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 // ES Modules equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -18,11 +19,38 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Ensure uploads directory structure exists
+const uploadsDir = path.join(__dirname, 'uploads');
+const uploadFolders = ['home', 'products-images', 'news', 'clients', 'general'];
+
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log('✅ Created uploads directory');
+}
+
+uploadFolders.forEach(folder => {
+  const folderPath = path.join(uploadsDir, folder);
+  if (!fs.existsSync(folderPath)) {
+    fs.mkdirSync(folderPath, { recursive: true });
+    console.log(`✅ Created uploads/${folder} directory`);
+  }
+});
+
 // Middleware
 app.use(corsMiddleware);
 app.use(express.json({ limit: '50mb' })); // Increase limit for base64 images
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(requestTimeout(30000)); // 30 seconds timeout
 app.use('/api', noCache); // No cache for all API routes
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  maxAge: '1y', // Cache images for 1 year
+  etag: true,
+  lastModified: true,
+}));
+console.log(`📁 Static files served from: ${path.join(__dirname, 'uploads')}`);
+console.log(`🌐 Uploaded images accessible at: http://localhost:${PORT}/uploads/...`);
 
 // Test database connection on startup
 (async () => {

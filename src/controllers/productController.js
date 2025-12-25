@@ -1,28 +1,29 @@
 // Products Controller
-import prisma from '../config/database.js';
-import mysqlPool from '../config/mysqlPool.js';
-import { formatProduct } from '../utils/formatters.js';
+import prisma from "../config/database.js";
+import mysqlPool from "../config/mysqlPool.js";
+import { formatProduct } from "../utils/formatters.js";
+import { deleteFileByUrl } from "../utils/upload.js";
 
 // Helper to format product from raw query
 const formatProductFromRaw = (product) => {
   let gallery = product.gallery;
-  if (gallery && typeof gallery === 'string') {
+  if (gallery && typeof gallery === "string") {
     try {
       gallery = JSON.parse(gallery);
     } catch (e) {
       gallery = null;
     }
   }
-  
+
   let specificationsTable = product.specifications_table;
-  if (specificationsTable && typeof specificationsTable === 'string') {
+  if (specificationsTable && typeof specificationsTable === "string") {
     try {
       specificationsTable = JSON.parse(specificationsTable);
     } catch (e) {
       specificationsTable = null;
     }
   }
-  
+
   const formatted = {
     id: product.id,
     name: product.name,
@@ -38,16 +39,18 @@ const formatProductFromRaw = (product) => {
     specificationsTable: specificationsTable,
     createdAt: product.created_at,
     updatedAt: product.updated_at,
-    productCategory: product.productCategory_id ? {
-      id: product.productCategory_id,
-      name: product.productCategory_name,
-      nameAr: product.productCategory_nameAr,
-      slug: product.productCategory_slug,
-      order: product.productCategory_order,
-      status: product.productCategory_status,
-      createdAt: product.productCategory_created_at,
-      updatedAt: product.productCategory_updated_at,
-    } : null,
+    productCategory: product.productCategory_id
+      ? {
+          id: product.productCategory_id,
+          name: product.productCategory_name,
+          nameAr: product.productCategory_nameAr,
+          slug: product.productCategory_slug,
+          order: product.productCategory_order,
+          status: product.productCategory_status,
+          createdAt: product.productCategory_created_at,
+          updatedAt: product.productCategory_updated_at,
+        }
+      : null,
   };
   return formatProduct(formatted);
 };
@@ -82,7 +85,7 @@ export const getAllProducts = async (req, res, next) => {
       LEFT JOIN product_categories pc ON p.category_id = pc.id
       ORDER BY p.created_at DESC, p.id DESC
     `);
-    
+
     res.json(products.map(formatProductFromRaw));
   } catch (error) {
     next(error);
@@ -92,7 +95,8 @@ export const getAllProducts = async (req, res, next) => {
 export const getProductById = async (req, res, next) => {
   try {
     const productId = parseInt(req.params.id);
-    const [products] = await mysqlPool.execute(`
+    const [products] = await mysqlPool.execute(
+      `
       SELECT 
         p.id,
         p.name,
@@ -120,13 +124,15 @@ export const getProductById = async (req, res, next) => {
       LEFT JOIN product_categories pc ON p.category_id = pc.id
       WHERE p.id = ?
       LIMIT 1
-    `, [productId]);
-    
+    `,
+      [productId]
+    );
+
     const product = products[0];
     if (!product) {
-      return res.status(404).json({ error: 'Product not found' });
+      return res.status(404).json({ error: "Product not found" });
     }
-    
+
     res.json(formatProductFromRaw(product));
   } catch (error) {
     next(error);
@@ -135,16 +141,62 @@ export const getProductById = async (req, res, next) => {
 
 export const createProduct = async (req, res, next) => {
   try {
-    const { name, nameAr, category_id, category, status, views, description, descriptionAr, image, gallery, specifications_table } = req.body;
-    
-    const galleryJson = gallery && Array.isArray(gallery) ? JSON.stringify(gallery) : null;
-    const specsJson = specifications_table ? JSON.stringify(specifications_table) : null;
-    
-    await mysqlPool.execute(`
+    const {
+      name,
+      nameAr,
+      category_id,
+      category,
+      status,
+      views,
+      description,
+      descriptionAr,
+      gallery,
+      specifications_table,
+    } = req.body;
+
+    // Determine image value
+    let imagePath = null;
+    if (req.file) {
+      // Use uploadedFileUrl if available, otherwise construct it
+      if (req.uploadedFileUrl) {
+        imagePath = req.uploadedFileUrl;
+      } else {
+        // Fallback: construct the path manually
+        const folderName = 'products-images'; // Product images go to products-images folder
+        const filename = req.file.filename;
+        imagePath = `/uploads/${folderName}/${filename}`;
+      }
+    } else if (req.body.image && req.body.image.startsWith("data:image")) {
+      // If base64 image is provided, keep it (backward compatibility)
+      imagePath = req.body.image;
+    }
+
+    const galleryJson =
+      gallery && Array.isArray(gallery) ? JSON.stringify(gallery) : null;
+    const specsJson = specifications_table
+      ? JSON.stringify(specifications_table)
+      : null;
+
+    await mysqlPool.execute(
+      `
       INSERT INTO products (name, nameAr, category_id, category, status, views, description, descriptionAr, image, gallery, specifications_table, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-    `, [name, nameAr || null, category_id || null, category || 'Mining', status || 'active', views || 0, description || null, descriptionAr || null, image || null, galleryJson, specsJson]);
-    
+    `,
+      [
+        name,
+        nameAr || null,
+        category_id || null,
+        category || "Mining",
+        status || "active",
+        views !== undefined && views !== null ? parseInt(String(views), 10) : 0,
+        description || null,
+        descriptionAr || null,
+        imagePath,
+        galleryJson,
+        specsJson,
+      ]
+    );
+
     const [products] = await mysqlPool.execute(`
       SELECT 
         p.*,
@@ -161,26 +213,30 @@ export const createProduct = async (req, res, next) => {
       ORDER BY p.id DESC
       LIMIT 1
     `);
-    
+
     const newProduct = products[0];
     if (!newProduct) {
-      return res.status(500).json({ error: 'Product was created but could not be retrieved' });
+      return res
+        .status(500)
+        .json({ error: "Product was created but could not be retrieved" });
     }
-    
+
     const formatted = {
       ...newProduct,
-      productCategory: newProduct.productCategory_id ? {
-        id: newProduct.productCategory_id,
-        name: newProduct.productCategory_name,
-        nameAr: newProduct.productCategory_nameAr,
-        slug: newProduct.productCategory_slug,
-        order: newProduct.productCategory_order,
-        status: newProduct.productCategory_status,
-        createdAt: newProduct.productCategory_created_at,
-        updatedAt: newProduct.productCategory_updated_at,
-      } : null,
+      productCategory: newProduct.productCategory_id
+        ? {
+            id: newProduct.productCategory_id,
+            name: newProduct.productCategory_name,
+            nameAr: newProduct.productCategory_nameAr,
+            slug: newProduct.productCategory_slug,
+            order: newProduct.productCategory_order,
+            status: newProduct.productCategory_status,
+            createdAt: newProduct.productCategory_created_at,
+            updatedAt: newProduct.productCategory_updated_at,
+          }
+        : null,
     };
-    
+
     delete formatted.productCategory_id;
     delete formatted.productCategory_name;
     delete formatted.productCategory_nameAr;
@@ -189,7 +245,7 @@ export const createProduct = async (req, res, next) => {
     delete formatted.productCategory_status;
     delete formatted.productCategory_created_at;
     delete formatted.productCategory_updated_at;
-    
+
     res.json(formatProduct(formatted));
   } catch (error) {
     next(error);
@@ -198,13 +254,75 @@ export const createProduct = async (req, res, next) => {
 
 export const updateProduct = async (req, res, next) => {
   try {
-    const { name, nameAr, category_id, category, status, views, description, descriptionAr, image, gallery, specifications_table } = req.body;
-    
-    const galleryJson = gallery && Array.isArray(gallery) ? JSON.stringify(gallery) : null;
-    const specsJson = specifications_table ? JSON.stringify(specifications_table) : null;
+    const {
+      name,
+      nameAr,
+      category_id,
+      category,
+      status,
+      views,
+      description,
+      descriptionAr,
+      image,
+      gallery,
+      specifications_table,
+    } = req.body;
+
     const productId = parseInt(req.params.id);
+
+    // Get existing product to check for old image and get current views
+    const [existingProducts] = await mysqlPool.execute(
+      "SELECT image, views FROM products WHERE id = ?",
+      [productId]
+    );
+
+    const existingProduct = existingProducts[0];
+    if (!existingProduct) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    // Determine image value
+    let imagePath = existingProduct.image; // Keep existing image by default
     
-    await mysqlPool.execute(`
+    if (req.file) {
+      // Delete old image file if it exists and is a file path (not base64)
+      if (
+        existingProduct.image &&
+        existingProduct.image.startsWith("/uploads/")
+      ) {
+        deleteFileByUrl(existingProduct.image);
+      }
+      // Use uploadedFileUrl if available, otherwise construct it
+      if (req.uploadedFileUrl) {
+        imagePath = req.uploadedFileUrl;
+      } else {
+        // Fallback: construct the path manually
+        const folderName = 'products-images'; // Product images go to products-images folder
+        const filename = req.file.filename;
+        imagePath = `/uploads/${folderName}/${filename}`;
+      }
+    } else if (req.body.image && req.body.image.startsWith("data:image")) {
+      // If base64 image is provided, keep it (backward compatibility)
+      imagePath = req.body.image;
+    } else if (req.body.image === null || req.body.image === "") {
+      // If image is being removed
+      if (
+        existingProduct.image &&
+        existingProduct.image.startsWith("/uploads/")
+      ) {
+        deleteFileByUrl(existingProduct.image);
+      }
+      imagePath = null;
+    }
+
+    const galleryJson =
+      gallery && Array.isArray(gallery) ? JSON.stringify(gallery) : null;
+    const specsJson = specifications_table
+      ? JSON.stringify(specifications_table)
+      : null;
+
+    await mysqlPool.execute(
+      `
       UPDATE products 
       SET name = ?, 
           nameAr = ?, 
@@ -219,9 +337,25 @@ export const updateProduct = async (req, res, next) => {
           specifications_table = ?, 
           updated_at = NOW()
       WHERE id = ?
-    `, [name, nameAr || null, category_id || null, category || 'Mining', status || 'active', views || 0, description || null, descriptionAr || null, image || null, galleryJson, specsJson, productId]);
-    
-    const [products] = await mysqlPool.execute(`
+    `,
+      [
+        name,
+        nameAr || null,
+        category_id || null,
+        category || "Mining",
+        status || "active",
+        views !== undefined && views !== null ? parseInt(String(views), 10) : existingProduct.views || 0,
+        description || null,
+        descriptionAr || null,
+        imagePath,
+        galleryJson,
+        specsJson,
+        productId,
+      ]
+    );
+
+    const [products] = await mysqlPool.execute(
+      `
       SELECT 
         p.*,
         pc.id as productCategory_id,
@@ -236,27 +370,31 @@ export const updateProduct = async (req, res, next) => {
       LEFT JOIN product_categories pc ON p.category_id = pc.id
       WHERE p.id = ?
       LIMIT 1
-    `, [productId]);
-    
+    `,
+      [productId]
+    );
+
     const updatedProduct = products[0];
     if (!updatedProduct) {
-      return res.status(404).json({ error: 'Product not found' });
+      return res.status(404).json({ error: "Product not found" });
     }
-    
+
     const formatted = {
       ...updatedProduct,
-      productCategory: updatedProduct.productCategory_id ? {
-        id: updatedProduct.productCategory_id,
-        name: updatedProduct.productCategory_name,
-        nameAr: updatedProduct.productCategory_nameAr,
-        slug: updatedProduct.productCategory_slug,
-        order: updatedProduct.productCategory_order,
-        status: updatedProduct.productCategory_status,
-        createdAt: updatedProduct.productCategory_created_at,
-        updatedAt: updatedProduct.productCategory_updated_at,
-      } : null,
+      productCategory: updatedProduct.productCategory_id
+        ? {
+            id: updatedProduct.productCategory_id,
+            name: updatedProduct.productCategory_name,
+            nameAr: updatedProduct.productCategory_nameAr,
+            slug: updatedProduct.productCategory_slug,
+            order: updatedProduct.productCategory_order,
+            status: updatedProduct.productCategory_status,
+            createdAt: updatedProduct.productCategory_created_at,
+            updatedAt: updatedProduct.productCategory_updated_at,
+          }
+        : null,
     };
-    
+
     delete formatted.productCategory_id;
     delete formatted.productCategory_name;
     delete formatted.productCategory_nameAr;
@@ -265,7 +403,7 @@ export const updateProduct = async (req, res, next) => {
     delete formatted.productCategory_status;
     delete formatted.productCategory_created_at;
     delete formatted.productCategory_updated_at;
-    
+
     res.json(formatProduct(formatted));
   } catch (error) {
     next(error);
@@ -275,18 +413,30 @@ export const updateProduct = async (req, res, next) => {
 export const deleteProduct = async (req, res, next) => {
   try {
     const productId = parseInt(req.params.id);
-    const [result] = await mysqlPool.execute(
-      'DELETE FROM products WHERE id = ?',
+
+    // Get product first to delete associated image file
+    const [products] = await mysqlPool.execute(
+      "SELECT image FROM products WHERE id = ?",
       [productId]
     );
-    
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Product not found' });
+
+    if (products.length === 0) {
+      return res.status(404).json({ error: "Product not found" });
     }
-    
+
+    // Delete image file if it exists and is a file path (not base64)
+    const product = products[0];
+    if (product.image && product.image.startsWith("/uploads/")) {
+      deleteFileByUrl(product.image);
+    }
+
+    const [result] = await mysqlPool.execute(
+      "DELETE FROM products WHERE id = ?",
+      [productId]
+    );
+
     res.json({ success: true });
   } catch (error) {
     next(error);
   }
 };
-
